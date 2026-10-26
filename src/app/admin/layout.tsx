@@ -30,7 +30,7 @@ export default async function AdminLayout({
             </Link>
 
             {/* Navigazione Principale Admin */}
-            <nav className="hidden sm:flex items-center gap-1 font-medium text-xs">
+            <nav className="hidden lg:flex items-center gap-1 font-medium text-xs">
               <Link
                 href="/admin"
                 className="px-3 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors flex items-center gap-1.5"
@@ -51,6 +51,27 @@ export default async function AdminLayout({
               >
                 <span className="material-symbols-outlined text-base" aria-hidden="true">rate_review</span>
                 Recensioni
+              </Link>
+              <Link
+                href="/admin/alternatives"
+                className="px-3 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors flex items-center gap-1.5"
+              >
+                <span className="material-symbols-outlined text-base" aria-hidden="true">compare_arrows</span>
+                Alternative
+              </Link>
+              <Link
+                href="/admin/prices"
+                className="px-3 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors flex items-center gap-1.5"
+              >
+                <span className="material-symbols-outlined text-base" aria-hidden="true">sell</span>
+                Prezzi & Link
+              </Link>
+              <Link
+                href="/admin/sources"
+                className="px-3 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors flex items-center gap-1.5"
+              >
+                <span className="material-symbols-outlined text-base" aria-hidden="true">menu_book</span>
+                Fonti
               </Link>
             </nav>
           </div>
@@ -79,24 +100,24 @@ export default async function AdminLayout({
         </div>
 
         {/* Barra di Navigazione Mobile per Admin */}
-        <div className="sm:hidden border-t border-slate-800 px-4 py-2 flex gap-2 overflow-x-auto text-xs">
-          <Link
-            href="/admin"
-            className="px-3 py-1.5 rounded-lg bg-slate-800 text-white shrink-0"
-          >
+        <div className="lg:hidden border-t border-slate-800 px-4 py-2 flex gap-2 overflow-x-auto text-xs">
+          <Link href="/admin" className="px-3 py-1.5 rounded-lg bg-slate-800 text-white shrink-0">
             Dashboard
           </Link>
-          <Link
-            href="/admin/pcs"
-            className="px-3 py-1.5 rounded-lg bg-slate-800 text-white shrink-0"
-          >
+          <Link href="/admin/pcs" className="px-3 py-1.5 rounded-lg bg-slate-800 text-white shrink-0">
             Catalogo PC
           </Link>
-          <Link
-            href="/admin/reviews"
-            className="px-3 py-1.5 rounded-lg bg-slate-800 text-white shrink-0"
-          >
+          <Link href="/admin/reviews" className="px-3 py-1.5 rounded-lg bg-slate-800 text-white shrink-0">
             Recensioni
+          </Link>
+          <Link href="/admin/alternatives" className="px-3 py-1.5 rounded-lg bg-slate-800 text-white shrink-0">
+            Alternative
+          </Link>
+          <Link href="/admin/prices" className="px-3 py-1.5 rounded-lg bg-slate-800 text-white shrink-0">
+            Prezzi & Link
+          </Link>
+          <Link href="/admin/sources" className="px-3 py-1.5 rounded-lg bg-slate-800 text-white shrink-0">
+            Fonti
           </Link>
         </div>
       </header>

@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { db } from "@/db";
-import { reviews, pcs } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { reviews, pcs, curatedAlternatives, sources, priceOffers } from "@/db/schema";
+import { eq, asc } from "drizzle-orm";
 import { publishReviewAction, unpublishReviewAction } from "../../actions";
 import { SITE_CONFIG } from "@/config/site";
 
@@ -20,6 +20,35 @@ export default async function ReviewPreviewPage({
 
   const pc = db.select().from(pcs).where(eq(pcs.id, review.pcId)).get();
   if (!pc) notFound();
+
+  // 1. Alternative curate collegate
+  const alternatives = db
+    .select({
+      alt: curatedAlternatives,
+      targetPc: pcs,
+    })
+    .from(curatedAlternatives)
+    .innerJoin(pcs, eq(curatedAlternatives.targetPcId, pcs.id))
+    .where(eq(curatedAlternatives.sourceReviewId, id))
+    .orderBy(asc(curatedAlternatives.displayOrder))
+    .all();
+
+  // 2. Fonti consultate
+  const reviewSources = db
+    .select()
+    .from(sources)
+    .where(eq(sources.reviewId, id))
+    .all();
+
+  // 3. Offerte commerciali registrate per questo PC
+  const offers = db
+    .select()
+    .from(priceOffers)
+    .where(eq(priceOffers.pcId, pc.id))
+    .all();
+
+  const now = Date.now();
+  const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
 
   let strengths: string[] = [];
   let weaknesses: string[] = [];
@@ -86,7 +115,7 @@ export default async function ReviewPreviewPage({
         </div>
       </div>
 
-      {/* RENDER DELLA SCHEDA ESATTAMENTE SECONDO IL DESIGN SYSTEM */}
+      {/* SCHEDA RECENSIONE */}
       <article className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 shadow-sm space-y-6">
         
         {/* Intestazione e Verdetto */}
@@ -116,7 +145,7 @@ export default async function ReviewPreviewPage({
           </p>
         </div>
 
-        {/* Analisi Recensioni Positive Amazon se presente */}
+        {/* Perché tante recensioni positive */}
         {review.whyPositiveReviews && (
           <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
             <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
@@ -129,7 +158,7 @@ export default async function ReviewPreviewPage({
           </div>
         )}
 
-        {/* Scheda Hardware Sintetica */}
+        {/* Scheda Hardware */}
         <div className="space-y-2">
           <div className="text-xs font-bold text-slate-900 uppercase tracking-wider">
             Scheda Tecnica Rilevata:
@@ -160,13 +189,12 @@ export default async function ReviewPreviewPage({
           </div>
         </div>
 
-        {/* SEMAFORO STANDARD SUI 3 AMBITI D'USO */}
+        {/* SEMAFORO STANDARD */}
         <div className="space-y-2">
           <div className="text-xs font-bold text-slate-900 uppercase tracking-wider">
             Idoneità d'Uso Standard PCChiaro:
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {/* GAMING */}
             <div className="p-3.5 rounded-xl border bg-slate-50/70 space-y-2 flex flex-col justify-between">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
@@ -179,7 +207,6 @@ export default async function ReviewPreviewPage({
               <p className="text-xs text-slate-600">{review.notesGaming || "Nessuna nota specifica"}</p>
             </div>
 
-            {/* LAVORO */}
             <div className="p-3.5 rounded-xl border bg-slate-50/70 space-y-2 flex flex-col justify-between">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
@@ -192,7 +219,6 @@ export default async function ReviewPreviewPage({
               <p className="text-xs text-slate-600">{review.notesWork || "Nessuna nota specifica"}</p>
             </div>
 
-            {/* STUDIO */}
             <div className="p-3.5 rounded-xl border bg-slate-50/70 space-y-2 flex flex-col justify-between">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
@@ -253,6 +279,234 @@ export default async function ReviewPreviewPage({
         )}
 
       </article>
+
+      {/* SEZIONE ALTERNATIVE CURATE MANUALMENTE (FASE 3) */}
+      <section className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 shadow-sm space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div>
+            <h3 className="font-headline font-bold text-lg text-slate-900 flex items-center gap-2">
+              <span className="material-symbols-outlined text-emerald-600" aria-hidden="true">compare_arrows</span>
+              Alternative Consigliate dalla Redazione ({alternatives.length})
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Collegamenti curati ed approvati manualmente (nessuna raccomandazione automatica).
+            </p>
+          </div>
+          <Link
+            href={`/admin/alternatives/new?reviewId=${review.id}`}
+            className="px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-semibold hover:bg-emerald-100 flex items-center gap-1"
+          >
+            <span className="material-symbols-outlined text-sm" aria-hidden="true">add</span>
+            Collega Alternativa
+          </Link>
+        </div>
+
+        {alternatives.length === 0 ? (
+          <div className="p-6 text-center text-slate-400 text-xs bg-slate-50 rounded-xl border border-dashed border-slate-200">
+            Nessuna alternativa collegata a questa recensione. Seleziona un PC valido dal catalogo da raccomandare.
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {alternatives.map(({ alt, targetPc }) => {
+              const isApproved = alt.isApproved === 1;
+
+              return (
+                <div
+                  key={alt.id}
+                  className={`p-5 rounded-2xl border ${
+                    isApproved
+                      ? "bg-status-successBg border-status-successBorder"
+                      : "bg-amber-50/60 border-amber-300"
+                  } space-y-3`}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span
+                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold font-mono border ${
+                        isApproved
+                          ? "bg-emerald-200 text-emerald-900 border-emerald-300"
+                          : "bg-amber-200 text-amber-900 border-amber-300"
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-xs" aria-hidden="true">
+                        {isApproved ? "verified" : "hourglass_top"}
+                      </span>
+                      {isApproved ? "ALTERNATIVA APPROVATA" : "⚠️ IN ATTESA DI APPROVAZIONE (Non pubblica)"}
+                    </span>
+                    <span className="text-xs text-slate-500 font-mono">
+                      Ordine #{alt.displayOrder} &bull; Controllato: {new Date(alt.lastVerifiedAt).toLocaleDateString("it-IT")}
+                    </span>
+                  </div>
+
+                  <div>
+                    <h4 className="font-headline font-bold text-lg text-slate-900">
+                      {targetPc.brand} {targetPc.modelName}
+                    </h4>
+                    <p className="text-xs font-semibold text-slate-700 mt-0.5">
+                      Target: {alt.intendedUse}
+                    </p>
+                  </div>
+
+                  {/* Hardware Target */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-white/80 p-2.5 rounded-xl border border-emerald-200 text-xs font-mono">
+                    <div>
+                      <span className="text-slate-500 block text-[10px]">CPU</span>
+                      <span className="font-semibold text-slate-900">{targetPc.cpuModel}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block text-[10px]">GPU</span>
+                      <span className="font-semibold text-slate-900">{targetPc.gpuModel}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block text-[10px]">RAM</span>
+                      <span className="font-semibold text-slate-900">{targetPc.ramGb}GB {targetPc.ramType}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block text-[10px]">PSU</span>
+                      <span className="font-semibold text-slate-900">{targetPc.psuWattage ? `${targetPc.psuWattage}W` : "Standard"}</span>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-slate-700 leading-relaxed">
+                    <strong>Motivazione:</strong> {alt.editorialReasoning}
+                  </p>
+
+                  {(alt.prosVsSource || alt.consVsSource) && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-1">
+                      {alt.prosVsSource && (
+                        <div className="text-emerald-900">
+                          <strong className="block text-[10px] uppercase font-mono text-emerald-700">Vantaggi:</strong>
+                          <span>{alt.prosVsSource}</span>
+                        </div>
+                      )}
+                      {alt.consVsSource && (
+                        <div className="text-amber-900">
+                          <strong className="block text-[10px] uppercase font-mono text-amber-700">Compromessi:</strong>
+                          <span>{alt.consVsSource}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* SEZIONE FONTI E METODOLOGIA (FASE 3) */}
+      <section className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 shadow-sm space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div>
+            <h3 className="font-headline font-bold text-lg text-slate-900 flex items-center gap-2">
+              <span className="material-symbols-outlined text-brand" aria-hidden="true">menu_book</span>
+              Fonti Consultate e Metodologia ({reviewSources.length})
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Trasparenza sulla provenienza dei dati tecnici e dei benchmark.
+            </p>
+          </div>
+          <Link
+            href={`/admin/sources/new?reviewId=${review.id}`}
+            className="px-3 py-1.5 rounded-lg bg-blue-50 text-brand border border-blue-200 text-xs font-semibold hover:bg-blue-100 flex items-center gap-1"
+          >
+            <span className="material-symbols-outlined text-sm" aria-hidden="true">add</span>
+            Aggiungi Fonte
+          </Link>
+        </div>
+
+        {reviewSources.length === 0 ? (
+          <div className="p-6 text-center text-slate-400 text-xs bg-slate-50 rounded-xl border border-dashed border-slate-200">
+            Nessuna fonte documentata per questa recensione. Aggiungi il link al datasheet o al benchmark per dare massima autorevolezza al giudizio.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {reviewSources.map((s) => (
+              <div key={s.id} className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-xs text-slate-900">{s.sourceName}</span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-white border border-slate-200 uppercase text-slate-600">
+                    {s.sourceType.replace("_", " ")}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-600">{s.notes}</p>
+                <div className="text-[11px] font-mono pt-1">
+                  <a
+                    href={s.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-brand hover:underline inline-flex items-center gap-1"
+                  >
+                    <span>{s.url}</span>
+                    <span className="material-symbols-outlined text-xs" aria-hidden="true">open_in_new</span>
+                  </a>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* SEZIONE OFFERTE COMMERCIALI ATTIVE (FASE 3) */}
+      <section className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 shadow-sm space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div>
+            <h3 className="font-headline font-bold text-lg text-slate-900 flex items-center gap-2">
+              <span className="material-symbols-outlined text-slate-700" aria-hidden="true">sell</span>
+              Offerte Commerciali Monitorate ({offers.length})
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Link affiliati e prezzi con data dell'ultima verifica.
+            </p>
+          </div>
+          <Link
+            href={`/admin/prices/new?pcId=${pc.id}`}
+            className="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold hover:bg-slate-200 flex items-center gap-1"
+          >
+            <span className="material-symbols-outlined text-sm" aria-hidden="true">add</span>
+            Aggiungi Offerta
+          </Link>
+        </div>
+
+        {offers.length === 0 ? (
+          <div className="p-6 text-center text-slate-400 text-xs bg-slate-50 rounded-xl border border-dashed border-slate-200">
+            Nessuna offerta registrata per questo modello.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {offers.map((o) => {
+              const isStale = o.lastVerifiedAt < thirtyDaysAgo;
+
+              return (
+                <div
+                  key={o.id}
+                  className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-200 bg-slate-50 gap-2"
+                >
+                  <div className="space-y-0.5">
+                    <div className="font-bold text-sm text-slate-900">
+                      {o.retailer} &bull; {o.priceAmountEur ? `${o.priceAmountEur.toFixed(2)} €` : "Prezzo non specificato"}
+                    </div>
+                    <div className="text-[11px] text-slate-500 font-mono">
+                      Ultima verifica: {new Date(o.lastVerifiedAt).toLocaleDateString("it-IT")}{" "}
+                      {isStale && <strong className="text-red-700">(⚠️ Prezzo non controllato da &gt;30 gg)</strong>}
+                    </div>
+                  </div>
+
+                  <a
+                    href={o.affiliateUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-4 py-2 bg-brand text-white font-semibold text-xs rounded-xl hover:bg-brand-hover inline-flex items-center gap-1.5 self-start sm:self-auto"
+                  >
+                    <span>Vedi su {o.retailer}</span>
+                    <span className="material-symbols-outlined text-xs" aria-hidden="true">open_in_new</span>
+                  </a>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
     </div>
   );
 }

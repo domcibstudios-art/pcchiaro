@@ -132,12 +132,12 @@ export function validateForPublication(review: z.infer<typeof reviewSchema>) {
  */
 export const curatedAlternativeSchema = z.object({
   id: z.string().min(1),
-  sourceReviewId: z.string().min(1),
-  targetPcId: z.string().min(1),
-  intendedUse: z.string().min(5, "L'uso consigliato deve essere descritto"),
-  editorialReasoning: z.string().min(10, "La motivazione editoriale deve essere spiegata chiaramente"),
-  prosVsSource: z.string().optional(),
-  consVsSource: z.string().optional(),
+  sourceReviewId: z.string().min(1, "La recensione di origine è obbligatoria"),
+  targetPcId: z.string().min(1, "Il PC alternativo è obbligatorio"),
+  intendedUse: z.string().min(5, "L'uso consigliato deve contenere almeno 5 caratteri"),
+  editorialReasoning: z.string().min(10, "La motivazione editoriale deve contenere almeno 10 caratteri"),
+  prosVsSource: z.string().nullable().optional(),
+  consVsSource: z.string().nullable().optional(),
   priceDifferenceEur: z.number().nullable().optional(),
   displayOrder: z.number().int().default(1),
   isApproved: z.boolean().default(false),
@@ -148,16 +148,16 @@ export const curatedAlternativeSchema = z.object({
  */
 export const priceOfferSchema = z.object({
   id: z.string().min(1),
-  pcId: z.string().min(1),
-  retailer: z.string().min(1),
+  pcId: z.string().min(1, "Il PC associato è obbligatorio"),
+  retailer: z.string().min(1, "Il rivenditore è obbligatorio"),
   affiliateUrl: z.string().url("URL affiliato non valido"),
-  cleanUrl: z.string().url("URL pulito non valido").optional().or(z.literal("")),
-  asin: z.string().optional(),
+  cleanUrl: z.string().url("URL pulito non valido").nullable().optional().or(z.literal("")),
+  asin: z.string().nullable().optional(),
   priceAmountEur: z.number().positive("Il prezzo deve essere positivo").nullable().optional(),
   currency: z.string().default("EUR"),
   dataSource: z.enum(["manual_check", "keepa", "creators_api"]).default("manual_check"),
   isValid: z.boolean().default(true),
-  notes: z.string().optional(),
+  notes: z.string().nullable().optional(),
 });
 
 /**
@@ -165,9 +165,9 @@ export const priceOfferSchema = z.object({
  */
 export const sourceSchema = z.object({
   id: z.string().min(1),
-  reviewId: z.string().min(1),
+  reviewId: z.string().min(1, "La recensione associata è obbligatoria"),
   url: z.string().url("URL della fonte non valido"),
   sourceName: z.string().min(2, "Nome della fonte obbligatorio"),
   sourceType: z.enum(["produttore", "inserzione_commerciale", "benchmark_indipendente", "test_diretto", "community"]),
-  notes: z.string().min(5, "Note esplicative sulla fonte obbligatorie"),
+  notes: z.string().min(5, "Note esplicative sulla fonte obbligatorie (almeno 5 caratteri)"),
 });
