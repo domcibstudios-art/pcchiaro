@@ -28,36 +28,3 @@ export function getShowExactPrices(): boolean {
     return SITE_CONFIG.pricing.defaultShowExactPrices;
   }
 }
-
-/**
- * Server Action per aggiornare con 1 clic l'impostazione dall'area amministrativa
- */
-export async function toggleShowExactPricesAction() {
-  await requireAdmin();
-
-  const current = getShowExactPrices();
-  const newValue = current ? "false" : "true";
-  const now = Date.now();
-
-  const existing = db
-    .select()
-    .from(siteSettings)
-    .where(eq(siteSettings.key, SETTING_KEY_SHOW_EXACT_PRICES))
-    .get();
-
-  if (existing) {
-    db.update(siteSettings)
-      .set({ value: newValue, updatedAt: now })
-      .where(eq(siteSettings.key, SETTING_KEY_SHOW_EXACT_PRICES))
-      .run();
-  } else {
-    db.insert(siteSettings)
-      .values({ key: SETTING_KEY_SHOW_EXACT_PRICES, value: newValue, updatedAt: now })
-      .run();
-  }
-
-  revalidatePath("/");
-  revalidatePath("/admin");
-  revalidatePath("/admin/prices");
-  revalidatePath("/admin/reviews");
-}

@@ -3,11 +3,42 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
-import { priceOffers, pcs } from "@/db/schema";
+import { priceOffers, pcs, siteSettings } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { requireAdmin } from "@/lib/session";
 import { priceOfferSchema } from "@/lib/validations";
+import { getShowExactPrices } from "@/lib/settings";
 import crypto from "crypto";
+
+export async function toggleShowExactPricesAction() {
+  await requireAdmin();
+
+  const current = getShowExactPrices();
+  const newValue = current ? "false" : "true";
+  const now = Date.now();
+
+  const existing = db
+    .select()
+    .from(siteSettings)
+    .where(eq(siteSettings.key, "show_exact_prices"))
+    .get();
+
+  if (existing) {
+    db.update(siteSettings)
+      .set({ value: newValue, updatedAt: now })
+      .where(eq(siteSettings.key, "show_exact_prices"))
+      .run();
+  } else {
+    db.insert(siteSettings)
+      .values({ key: "show_exact_prices", value: newValue, updatedAt: now })
+      .run();
+  }
+
+  revalidatePath("/");
+  revalidatePath("/admin");
+  revalidatePath("/admin/prices");
+  revalidatePath("/admin/reviews");
+}
 
 export async function savePriceOfferAction(
   prevState: { error?: string } | undefined,

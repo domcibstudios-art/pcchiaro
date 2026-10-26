@@ -2,9 +2,14 @@ import Link from "next/link";
 import { db } from "@/db";
 import { priceOffers, pcs } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { verifyPriceOfferAction, toggleOfferValidityAction, deletePriceOfferAction } from "./actions";
+import {
+  verifyPriceOfferAction,
+  toggleOfferValidityAction,
+  deletePriceOfferAction,
+  toggleShowExactPricesAction,
+} from "./actions";
 import DeleteButton from "@/components/admin/delete-button";
-import { getShowExactPrices, toggleShowExactPricesAction } from "@/lib/settings";
+import { getShowExactPrices } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
