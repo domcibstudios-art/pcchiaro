@@ -73,6 +73,13 @@ export default async function AdminLayout({
                 <span className="material-symbols-outlined text-base" aria-hidden="true">menu_book</span>
                 Fonti
               </Link>
+              <Link
+                href="/admin/import"
+                className="px-3 py-2 rounded-lg bg-brand text-white hover:bg-brand-hover transition-colors flex items-center gap-1.5 font-semibold"
+              >
+                <span className="material-symbols-outlined text-base" aria-hidden="true">auto_fix_high</span>
+                Importa da Amazon
+              </Link>
             </nav>
           </div>
 

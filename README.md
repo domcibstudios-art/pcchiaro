@@ -120,7 +120,31 @@ L'applicazione sarà disponibile su [http://localhost:3000](http://localhost:300
 
 ---
 
-## 5. Credenziali Amministrative & Configurazione Produzione
+## 5. Importazione Intelligente da Amazon.it (PC, Recensioni, Fonti, Offerte)
+
+PCChiaro.it include un modulo di estrazione ed euristica automatica per accelerare l'inserimento dei dati evitando la trascrizione manuale:
+
+### Modalità A: Da Interfaccia Web Amministrativa (`/admin/import`)
+1. Accedi a [http://localhost:3000/admin/import](http://localhost:3000/admin/import);
+2. Incolla il link del prodotto Amazon.it (oppure il testo o codice HTML della scheda tecnica);
+3. Clicca su **Analizza ed Estrai Specifiche**: il sistema compila la scheda hardware (CPU, GPU, RAM, Storage), rileva le specifiche omesse, formula una bozza di recensione con semaforo d'uso e aggancia le fonti ufficiali (Amazon + Intel Ark/AMD + TechPowerUp);
+4. Modifica o integra i dati direttamente nel form di anteprima;
+5. Clicca su **Salva Tutto come Bozza nel Catalogo**: crea i record collegati in SQLite con stato `draft`.
+
+### Modalità B: Da Terminale (Script CLI)
+Se Amazon presenta protezioni anti-bot CAPTCHA, puoi eseguire l'estrazione locale:
+```bash
+# Da URL diretto:
+npx tsx scripts/extract-amazon.ts "https://www.amazon.it/dp/B0..."
+
+# Oppure da file HTML salvato dal browser:
+npx tsx scripts/extract-amazon.ts pagina_salvata.html
+```
+Il comando salva un pacchetto JSON pronto in `data/imports/draft-[asin].json`, che puoi poi caricare con un clic nell'interfaccia `/admin/import`.
+
+---
+
+## 6. Credenziali Amministrative & Configurazione Produzione
 
 ### Credenziali predefinite in ambiente di sviluppo:
 - **URL Login:** [http://localhost:3000/admin/login](http://localhost:3000/admin/login)
@@ -146,7 +170,7 @@ L'applicazione sarà disponibile su [http://localhost:3000](http://localhost:300
 
 ---
 
-## 6. Guida al Deployment & Backup SQLite
+## 7. Guida al Deployment & Backup SQLite
 
 ### Requisito Fondamentale: Storage Persistente
 Il database SQLite risiede su file (`data/pcchiaro.db`).  
@@ -161,9 +185,11 @@ sqlite3 data/pcchiaro.db ".backup 'data/backups/pcchiaro-backup-$(date +%Y%m%d_%
 
 ---
 
-## 7. Esecuzione dei Test Automatizzati
+## 8. Esecuzione dei Test Automatizzati
 
-Il progetto include **23 test automatizzati** che coprono l'intero stack:
+Il progetto include **26 test automatizzati** che coprono l'intero stack:
+- Estrazione ed euristica automatica Amazon (CPU generation, Windows 11 check, GPU VRAM, RAM channel, unverified specs)
+- Importazione transazionale atomica (PC, recensione bozza, fonti e offerta)
 - Validazioni Zod dei dati hardware ed editoriali
 - Integrità referenziale SQLite (`ON DELETE CASCADE`, `ON DELETE RESTRICT`)
 - Hashing Scrypt e firma HMAC dei cookie di sessione
