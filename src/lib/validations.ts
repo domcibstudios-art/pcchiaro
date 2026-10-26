@@ -9,46 +9,46 @@ export const pcSchema = z.object({
   modelName: z.string().min(1, "Il nome modello è obbligatorio"),
   exactConfig: z.string().min(1, "La configurazione esatta è obbligatoria"),
   category: z.enum(["desktop_gaming", "desktop_office", "mini_pc", "laptop"]),
-  imageUrl: z.string().url("URL immagine non valido").optional().or(z.literal("")),
-  imageAlt: z.string().optional(),
+  imageUrl: z.string().url("URL immagine non valido").nullable().optional().or(z.literal("")),
+  imageAlt: z.string().nullable().optional(),
 
   // CPU
   cpuModel: z.string().min(1, "Il modello di CPU è obbligatorio"),
-  cpuGen: z.string().optional(),
-  cpuCoresThreads: z.string().optional(),
+  cpuGen: z.string().nullable().optional(),
+  cpuCoresThreads: z.string().nullable().optional(),
   cpuWin11Support: z.number().int().min(0).max(1).nullable().optional(),
 
   // GPU
   gpuModel: z.string().min(1, "Il modello di GPU è obbligatorio"),
   gpuVramGb: z.number().int().nonnegative().nullable().optional(),
   gpuType: z.enum(["dedicated", "integrated", "unknown"]),
-  gpuDlssFsr: z.string().optional(),
+  gpuDlssFsr: z.string().nullable().optional(),
 
   // RAM
   ramGb: z.number().int().positive("La quantità di RAM deve essere maggiore di 0"),
-  ramType: z.enum(["DDR3", "DDR4", "DDR5", "unknown"]).optional(),
-  ramChannel: z.enum(["single", "dual", "unknown"]).optional(),
+  ramType: z.enum(["DDR3", "DDR4", "DDR5", "unknown"]).nullable().optional(),
+  ramChannel: z.enum(["single", "dual", "unknown"]).nullable().optional(),
   ramSpeedMhz: z.number().int().positive().nullable().optional(),
 
   // Storage
-  storageType: z.enum(["NVMe", "SATA_SSD", "HDD", "unknown"]).optional(),
+  storageType: z.enum(["NVMe", "SATA_SSD", "HDD", "unknown"]).nullable().optional(),
   storageCapacityGb: z.number().int().positive().nullable().optional(),
-  storageDetails: z.string().optional(),
+  storageDetails: z.string().nullable().optional(),
 
   // Scheda madre & Alimentatore
-  motherboardChipset: z.string().optional(),
-  motherboardDetails: z.string().optional(),
+  motherboardChipset: z.string().nullable().optional(),
+  motherboardDetails: z.string().nullable().optional(),
   psuWattage: z.number().int().positive().nullable().optional(),
-  psuRating: z.enum(["80+_bronze", "80+_gold", "80+_platinum", "non_certificato", "unknown"]).optional(),
-  psuDetails: z.string().optional(),
-  coolingDetails: z.string().optional(),
+  psuRating: z.enum(["80+_bronze", "80+_gold", "80+_platinum", "non_certificato", "unknown"]).nullable().optional(),
+  psuDetails: z.string().nullable().optional(),
+  coolingDetails: z.string().nullable().optional(),
 
   // OS
-  osInstalled: z.string().optional(),
+  osInstalled: z.string().nullable().optional(),
   osOfficialSupport: z.number().int().min(0).max(1).nullable().optional(),
 
   // Note sui componenti omessi/non verificati
-  unverifiedSpecs: z.array(z.string()).optional(),
+  unverifiedSpecs: z.array(z.string()).nullable().optional(),
 
   // Stato editoriale
   editorialStatus: z.enum(["draft", "published", "archived"]).default("draft"),
@@ -65,8 +65,8 @@ export const reviewSchema = z.object({
     .min(3, "Lo slug deve contenere almeno 3 caratteri")
     .regex(/^[a-z0-9-]+$/, "Lo slug può contenere solo lettere minuscole, numeri e trattini"),
   title: z.string().min(5, "Il titolo della recensione deve contenere almeno 5 caratteri"),
-  metaTitle: z.string().optional(),
-  metaDescription: z.string().optional(),
+  metaTitle: z.string().nullable().optional(),
+  metaDescription: z.string().nullable().optional(),
 
   verdict: z.enum([
     "sconsigliato",
@@ -77,18 +77,18 @@ export const reviewSchema = z.object({
   ]),
 
   summaryIntro: z.string().min(20, "La sintesi iniziale deve contenere almeno 20 caratteri"),
-  whyPositiveReviews: z.string().optional(),
+  whyPositiveReviews: z.string().nullable().optional(),
   strengths: z.array(z.string()).min(1, "Inserire almeno un punto di forza o nota positiva"),
   weaknesses: z.array(z.string()).min(1, "Inserire almeno un limite o punto di attenzione"),
 
   evidenceLevel: z.enum(["specifiche_dichiarate", "verifica_indipendente", "test_diretto"]),
 
   ratingGaming: z.enum(["idoneo", "limitato", "non_adatto"]),
-  notesGaming: z.string().optional(),
+  notesGaming: z.string().nullable().optional(),
   ratingWork: z.enum(["idoneo", "limitato", "non_adatto"]),
-  notesWork: z.string().optional(),
+  notesWork: z.string().nullable().optional(),
   ratingOffice: z.enum(["idoneo", "limitato", "non_adatto"]),
-  notesOffice: z.string().optional(),
+  notesOffice: z.string().nullable().optional(),
 
   amazonListingPriceEur: z.number().nonnegative().nullable().optional(),
   estimatedFairValueEur: z.number().nonnegative().nullable().optional(),
