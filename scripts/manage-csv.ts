@@ -5,6 +5,7 @@ import { db } from "../src/db";
 import { pcs, reviews, priceOffers, sources } from "../src/db/schema";
 import { eq } from "drizzle-orm";
 import { parseAmazonListing } from "../src/lib/amazon-extractor";
+import { parseCsvText } from "../src/lib/csv-parser";
 
 const CSV_HEADER = [
   "asin",
@@ -120,52 +121,51 @@ export function importFromCsv(filePath: string) {
   }
 
   const content = fs.readFileSync(filePath, "utf-8");
-  const lines = content.split(/\r?\n/).filter((l) => l.trim().length > 0);
+  const { headers, rows } = parseCsvText(content);
 
-  if (lines.length <= 1) {
-    console.log("ℹ️ Il file CSV non contiene righe di dati.");
+  if (rows.length === 0) {
+    console.log("ℹ️ Il file CSV non contiene righe di dati valide.");
     return;
   }
+
+  const getCol = (parts: string[], name: string, fallbackIdx: number): string => {
+    const idx = headers.findIndex((h) => h.toLowerCase().trim() === name.toLowerCase().trim());
+    const targetIdx = idx !== -1 ? idx : fallbackIdx;
+    return parts[targetIdx] !== undefined ? parts[targetIdx].trim() : "";
+  };
 
   const now = Date.now();
   let importedCount = 0;
 
-  // Salta intestazione
-  for (let i = 1; i < lines.length; i++) {
-    const rawLine = lines[i];
-    // Parsing semplice separatore punto e virgola
-    const parts = rawLine.split(";").map((p) => p.replace(/^"|"$/g, "").replace(/""/g, '"').trim());
-
-    const [
-      asin,
-      brand,
-      modello,
-      categoria,
-      cpuModello,
-      cpuGen,
-      cpuWin11,
-      gpuModello,
-      gpuTipo,
-      gpuVram,
-      ramGb,
-      ramTipo,
-      ramCanale,
-      storageGb,
-      storageTipo,
-      verdetto,
-      titoloRecensione,
-      sommarioIntro,
-      semaforoGaming,
-      noteGaming,
-      semaforoLavoro,
-      noteLavoro,
-      semaforoUfficio,
-      noteUfficio,
-      puntiForza,
-      criticita,
-      prezzoIndicativo,
-      amazonUrl,
-    ] = parts;
+  for (const parts of rows) {
+    const asin = getCol(parts, "asin", 0);
+    const brand = getCol(parts, "brand", 1);
+    const modello = getCol(parts, "modello", 2);
+    const categoria = getCol(parts, "categoria", 3);
+    const cpuModello = getCol(parts, "cpu_modello", 4);
+    const cpuGen = getCol(parts, "cpu_gen", 5);
+    const cpuWin11 = getCol(parts, "cpu_win11_support", 6);
+    const gpuModello = getCol(parts, "gpu_modello", 7);
+    const gpuTipo = getCol(parts, "gpu_tipo", 8);
+    const gpuVram = getCol(parts, "gpu_vram_gb", 9);
+    const ramGb = getCol(parts, "ram_gb", 10);
+    const ramTipo = getCol(parts, "ram_tipo", 11);
+    const ramCanale = getCol(parts, "ram_canale", 12);
+    const storageGb = getCol(parts, "storage_gb", 13);
+    const storageTipo = getCol(parts, "storage_tipo", 14);
+    const verdetto = getCol(parts, "verdetto", 15);
+    const titoloRecensione = getCol(parts, "titolo_recensione", 16);
+    const sommarioIntro = getCol(parts, "sommario_intro", 17);
+    const semaforoGaming = getCol(parts, "semaforo_gaming", 18);
+    const noteGaming = getCol(parts, "note_gaming", 19);
+    const semaforoLavoro = getCol(parts, "semaforo_lavoro", 20);
+    const noteLavoro = getCol(parts, "note_lavoro", 21);
+    const semaforoUfficio = getCol(parts, "semaforo_ufficio", 22);
+    const noteUfficio = getCol(parts, "note_ufficio", 23);
+    const puntiForza = getCol(parts, "punti_forza", 24);
+    const criticita = getCol(parts, "criticita", 25);
+    const prezzoIndicativo = getCol(parts, "prezzo_indicativo", 26);
+    const amazonUrl = getCol(parts, "amazon_url", 27);
 
     if (!brand || !modello || !cpuModello) continue;
 

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { parseAmazonInputAction, saveImportedPackageAction, importCsvContentAction } from "./actions";
 import { ExtractedHardwarePackage } from "@/lib/amazon-extractor";
+import { parseCsvText } from "@/lib/csv-parser";
 import VerdictBadge from "@/components/public/verdict-badge";
 
 interface CsvRowPreview {
@@ -20,49 +21,29 @@ interface CsvRowPreview {
 }
 
 function parseCsvPreview(csvText: string): CsvRowPreview[] {
-  const lines = csvText.trim().split(/\r?\n/).filter((l) => l.trim().length > 0);
-  if (lines.length <= 1) return [];
+  const { headers, rows } = parseCsvText(csvText);
+  if (rows.length === 0) return [];
 
-  const rows: CsvRowPreview[] = [];
-  for (let i = 1; i < lines.length; i++) {
-    const rawLine = lines[i];
-    const separator = rawLine.includes(";") ? ";" : ",";
-    const parts = rawLine
-      .split(separator)
-      .map((p) => p.replace(/^"|"$/g, "").replace(/""/g, '"').trim());
+  const getCol = (parts: string[], name: string, fallbackIdx: number): string => {
+    const idx = headers.findIndex((h) => h.toLowerCase().trim() === name.toLowerCase().trim());
+    const targetIdx = idx !== -1 ? idx : fallbackIdx;
+    return parts[targetIdx] !== undefined ? parts[targetIdx].trim() : "";
+  };
 
-    const [
-      asin,
-      brand,
-      modello,
-      ,
-      cpuModello,
-      ,
-      ,
-      gpuModello,
-      ,
-      ,
-      ramGb,
-      ,
-      ,
-      storageGb,
-      ,
-      verdetto,
-      ,
-      ,
-      ,
-      ,
-      ,
-      ,
-      ,
-      ,
-      ,
-      ,
-      prezzoIndicativo,
-    ] = parts;
+  const previews: CsvRowPreview[] = [];
+  for (const parts of rows) {
+    const asin = getCol(parts, "asin", 0);
+    const brand = getCol(parts, "brand", 1);
+    const modello = getCol(parts, "modello", 2);
+    const cpuModello = getCol(parts, "cpu_modello", 4);
+    const gpuModello = getCol(parts, "gpu_modello", 7);
+    const ramGb = getCol(parts, "ram_gb", 10);
+    const storageGb = getCol(parts, "storage_gb", 13);
+    const verdetto = getCol(parts, "verdetto", 15);
+    const prezzoIndicativo = getCol(parts, "prezzo_indicativo", 26);
 
     if (brand || modello) {
-      rows.push({
+      previews.push({
         asin: asin || "-",
         brand: brand || "-",
         modello: modello || "-",
@@ -75,12 +56,12 @@ function parseCsvPreview(csvText: string): CsvRowPreview[] {
       });
     }
   }
-  return rows;
+  return previews;
 }
 
 function downloadCsvTemplate() {
   const templateContent = `asin;brand;modello;categoria;cpu_modello;cpu_gen;cpu_win11_support;gpu_modello;gpu_tipo;gpu_vram_gb;ram_gb;ram_tipo;ram_canale;storage_gb;storage_tipo;verdetto;titolo_recensione;sommario_intro;semaforo_gaming;note_gaming;semaforo_lavoro;note_lavoro;semaforo_ufficio;note_ufficio;punti_forza;criticita;prezzo_indicativo;amazon_url
-B0GQZDM5WK;HP;OmniBook 3 16-by0001slx;laptop;AMD Ryzen 5 130;Zen 3+ (Rembrandt - Rebrand 2024);1;AMD Radeon 660M;integrated;0;8;LPDDR5;single;512;NVMe;accettabile_base;HP OmniBook 3 16" (Ryzen 5 130 + Radeon 660M);Notebook per produttività e studio con display 16 pollici 2K IPS: silenzioso ed efficiente, ma con soli 8GB di RAM e CPU Zen 3+ del 2022 rimarchiata.;limitato;Grafica integrata Radeon 660M da sole 6 CU: adatta solo a eSports leggeri e giochi 2D; inadeguata per 1080p moderno nativo.;limitato;6 core / 12 thread veloci per calcolo e multitasking, ma fortemente limitato dagli 8GB di RAM per rendering e video editing.;idoneo;Ottimo per Office, studio, navigazione web intensiva e streaming video grazie all'ampio schermo 16 pollici 2K IPS nitido.;Schermo 16 pollici 2K IPS 300 nits antiriflesso molto confortevole | Processore 6 core efficiente con supporto nativo a Windows 11 | SSD NVMe veloce da 512GB;Attenzione al rebrand: il Ryzen 5 130 è vecchio silicio Zen 3+ del 2022 con prestazioni e NPU inferiori a Zen 4/5 | Soli 8GB di RAM: limite stringente per carichi futuri e multitasking pesante | Grafica integrata con sole 6 CU RDNA2 inadatta al gaming 3D moderno;599.99;https://www.amazon.it/HP-16-by0001slx-integrata-Antiriflesso-Portatile/dp/B0GQZDM5WK`;
+B0GQZDM5WK;HP;OmniBook 3 16-by0001slx;laptop;"AMD Ryzen 5 130";"Zen 3+ (Rembrandt - Rebrand 2024)";1;"AMD Radeon 660M";integrated;0;8;LPDDR5;single;512;NVMe;accettabile_base;"HP OmniBook 3 16"" (Ryzen 5 130 + Radeon 660M)";"Notebook per produttività e studio con display 16 pollici 2K IPS: silenzioso ed efficiente, ma con soli 8GB di RAM e CPU Zen 3+ del 2022 rimarchiata.";limitato;"Grafica integrata Radeon 660M da sole 6 CU: adatta solo a eSports leggeri e giochi 2D, inadeguata per 1080p moderno nativo.";limitato;"6 core / 12 thread veloci per calcolo e multitasking, ma fortemente limitato dagli 8GB di RAM per rendering e video editing.";idoneo;"Ottimo per Office, studio, navigazione web intensiva e streaming video grazie all'ampio schermo 16 pollici 2K IPS nitido.";"Schermo 16 pollici 2K IPS 300 nits antiriflesso molto confortevole | Processore 6 core efficiente con supporto nativo a Windows 11 | SSD NVMe veloce da 512GB";"Attenzione al rebrand: il Ryzen 5 130 è vecchio silicio Zen 3+ del 2022 con prestazioni e NPU inferiori a Zen 4/5 | Soli 8GB di RAM: limite stringente per carichi futuri e multitasking pesante | Grafica integrata con sole 6 CU RDNA2 inadatta al gaming 3D moderno";599.99;https://www.amazon.it/HP-16-by0001slx-integrata-Antiriflesso-Portatile/dp/B0GQZDM5WK`;
 
   const blob = new Blob([templateContent], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
