@@ -4,6 +4,7 @@ import { reviews, pcs } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { publishReviewAction, unpublishReviewAction, deleteReviewAction } from "./actions";
 import { SITE_CONFIG } from "@/config/site";
+import DeleteButton from "@/components/admin/delete-button";
 
 export const dynamic = "force-dynamic";
 
@@ -221,20 +222,10 @@ export default async function AdminReviewsPage({
 
                           {/* Elimina */}
                           <form action={deleteReviewAction.bind(null, review.id)}>
-                            <button
-                              type="submit"
-                              className="p-1.5 rounded-lg text-slate-400 hover:text-red-700 hover:bg-red-50 transition-colors"
+                            <DeleteButton
                               title="Elimina recensione"
-                              onClick={(e) => {
-                                if (!confirm("Vuoi davvero eliminare questa recensione?")) {
-                                  e.preventDefault();
-                                }
-                              }}
-                            >
-                              <span className="material-symbols-outlined text-base" aria-hidden="true">
-                                delete
-                              </span>
-                            </button>
+                              confirmMessage="Vuoi davvero eliminare questa recensione?"
+                            />
                           </form>
                         </div>
                       </td>
