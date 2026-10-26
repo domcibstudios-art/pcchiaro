@@ -40,6 +40,7 @@ export interface ReviewCardItem {
   };
   offer?: {
     affiliateUrl: string;
+    cleanUrl?: string | null;
     asin?: string | null;
     priceAmountEur?: number | null;
     isValid?: number | null;
@@ -56,8 +57,8 @@ export default function ReviewCard({
   const isBad = review.verdict === "sconsigliato";
   const isGood = review.verdict === "buon_acquisto";
 
-  // Target CTA url (se c'è l'offerta affiliata valida usiamo quella, altrimenti amazonUrl del pc)
-  const affiliateUrl = offer?.isValid ? offer.affiliateUrl : "#";
+  // Target CTA url (calcolato dal server con il tag affiliato centralizzato)
+  const affiliateUrl = offer?.isValid && offer.affiliateUrl ? offer.affiliateUrl : "#";
 
   let parsedUnverified: string[] = [];
   if (pc.unverifiedSpecs) {

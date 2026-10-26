@@ -6,6 +6,7 @@ import { eq, asc } from "drizzle-orm";
 import { publishReviewAction, unpublishReviewAction } from "../../actions";
 import { SITE_CONFIG } from "@/config/site";
 import { getShowExactPrices } from "@/lib/settings";
+import { buildAffiliateUrl } from "@/lib/affiliate";
 
 export const dynamic = "force-dynamic";
 
@@ -504,7 +505,7 @@ export default async function ReviewPreviewPage({
                   </div>
 
                   <a
-                    href={o.affiliateUrl}
+                    href={buildAffiliateUrl(o.cleanUrl || o.affiliateUrl || o.asin)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="px-4 py-2 bg-brand text-white font-semibold text-xs rounded-xl hover:bg-brand-hover inline-flex items-center gap-1.5 self-start sm:self-auto"

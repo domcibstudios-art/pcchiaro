@@ -9,7 +9,9 @@ import {
   toggleShowExactPricesAction,
 } from "./actions";
 import DeleteButton from "@/components/admin/delete-button";
-import { getShowExactPrices } from "@/lib/settings";
+import { getShowExactPrices, getAmazonAffiliateTag } from "@/lib/settings";
+import { buildAffiliateUrl } from "@/lib/affiliate";
+import AffiliateTagCard from "./affiliate-tag-card";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +24,7 @@ export default async function AdminPricesPage({
   const now = Date.now();
   const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
   const showExactPrices = getShowExactPrices();
+  const affiliateTag = getAmazonAffiliateTag();
 
   const allOffers = db
     .select({
@@ -103,6 +106,9 @@ export default async function AdminPricesPage({
         </form>
       </div>
 
+      {/* Gestione Centralizzata Tag Affiliazione Amazon */}
+      <AffiliateTagCard initialTag={affiliateTag} />
+
       {/* Filtri */}
       <div className="bg-white border border-slate-200 rounded-xl p-3 flex flex-wrap gap-2 text-xs">
         <Link
@@ -182,7 +188,7 @@ export default async function AdminPricesPage({
                         </div>
                         <div>
                           <a
-                            href={offer.affiliateUrl}
+                            href={buildAffiliateUrl(offer.cleanUrl || offer.affiliateUrl || offer.asin)}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-brand hover:underline text-[11px] inline-flex items-center gap-0.5"

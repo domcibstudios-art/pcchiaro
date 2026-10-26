@@ -7,8 +7,26 @@ import { priceOffers, pcs, siteSettings } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { requireAdmin } from "@/lib/session";
 import { priceOfferSchema } from "@/lib/validations";
-import { getShowExactPrices } from "@/lib/settings";
+import { getShowExactPrices, setAmazonAffiliateTag } from "@/lib/settings";
 import crypto from "crypto";
+
+export async function updateAmazonAffiliateTagAction(
+  prevState: { error?: string; success?: boolean } | undefined,
+  formData: FormData
+) {
+  await requireAdmin();
+
+  const tag = (formData.get("amazonAffiliateTag") as string) || "";
+  setAmazonAffiliateTag(tag.trim());
+
+  revalidatePath("/");
+  revalidatePath("/admin");
+  revalidatePath("/admin/prices");
+  revalidatePath("/admin/reviews");
+  revalidatePath("/recensioni/[slug]", "page");
+
+  return { success: true };
+}
 
 export async function toggleShowExactPricesAction() {
   await requireAdmin();

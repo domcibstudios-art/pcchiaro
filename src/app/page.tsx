@@ -3,6 +3,7 @@ import { pcs, reviews, priceOffers } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { SITE_CONFIG } from "@/config/site";
 import { getShowExactPrices } from "@/lib/settings";
+import { buildAffiliateUrl } from "@/lib/affiliate";
 import SiteHeader from "@/components/public/site-header";
 import SiteFooter from "@/components/public/site-footer";
 import BottomNav from "@/components/public/bottom-nav";
@@ -49,7 +50,8 @@ export default async function HomePage() {
       pc,
       offer: offer
         ? {
-            affiliateUrl: offer.affiliateUrl,
+            affiliateUrl: buildAffiliateUrl(offer.cleanUrl || offer.affiliateUrl || offer.asin),
+            cleanUrl: offer.cleanUrl,
             asin: offer.asin,
             priceAmountEur: offer.priceAmountEur,
             isValid: offer.isValid,

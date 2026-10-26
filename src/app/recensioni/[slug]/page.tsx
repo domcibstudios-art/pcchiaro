@@ -6,6 +6,7 @@ import { pcs, reviews, curatedAlternatives, priceOffers, sources } from "@/db/sc
 import { eq, and, asc } from "drizzle-orm";
 import { SITE_CONFIG } from "@/config/site";
 import { getShowExactPrices } from "@/lib/settings";
+import { buildAffiliateUrl } from "@/lib/affiliate";
 import { generateSeoMeta, generateReviewFaqs, generateStructuredData } from "@/lib/seo-engine";
 import SiteHeader from "@/components/public/site-header";
 import SiteFooter from "@/components/public/site-footer";
@@ -161,7 +162,9 @@ export default async function ReviewDetailPage({ params }: ReviewPageProps) {
     }
   }
 
-  const affiliateUrl = activeOffer?.affiliateUrl || "#";
+  const affiliateUrl = activeOffer
+    ? buildAffiliateUrl(activeOffer.cleanUrl || activeOffer.affiliateUrl || activeOffer.asin)
+    : "#";
 
   // Generazione automatica FAQ e Dati Strutturati Schema.org
   const faqs = generateReviewFaqs(review, pc);
@@ -172,7 +175,9 @@ export default async function ReviewDetailPage({ params }: ReviewPageProps) {
       ? {
           asin: activeOffer.asin,
           priceAmountEur: activeOffer.priceAmountEur,
-          affiliateUrl: activeOffer.affiliateUrl,
+          affiliateUrl: buildAffiliateUrl(
+            activeOffer.cleanUrl || activeOffer.affiliateUrl || activeOffer.asin
+          ),
         }
       : undefined,
     faqs,
@@ -578,9 +583,11 @@ export default async function ReviewDetailPage({ params }: ReviewPageProps) {
                         )}
                       </div>
 
-                      {targetOffer?.affiliateUrl && (
+                      {targetOffer && (
                         <a
-                          href={targetOffer.affiliateUrl}
+                          href={buildAffiliateUrl(
+                            targetOffer.cleanUrl || targetOffer.affiliateUrl || targetOffer.asin
+                          )}
                           target="_blank"
                           rel="noopener noreferrer nofollow"
                           className="min-h-[44px] px-5 rounded-xl bg-brand text-white font-semibold text-xs sm:text-sm hover:bg-brand-hover active:scale-95 transition-all flex items-center justify-center gap-2 shadow-sm"
