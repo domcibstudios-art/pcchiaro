@@ -463,12 +463,17 @@ export default async function ReviewDetailPage({ params }: ReviewPageProps) {
                     className="bg-white border border-emerald-200 rounded-2xl p-5 shadow-sm space-y-3 hover:border-emerald-300 transition-colors"
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="text-xs font-mono font-bold px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-lg">
-                        Alternativa per: {alt.intendedUse}
-                      </span>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-mono font-bold px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-lg">
+                          Alternativa per: {alt.intendedUse}
+                        </span>
+                        {targetReview && (
+                          <VerdictBadge verdict={targetReview.verdict} size="sm" />
+                        )}
+                      </div>
                       {alt.priceDifferenceEur !== null && (
                         <span className="text-xs font-mono text-slate-500">
-                          Differenza prezzo stimata: {alt.priceDifferenceEur > 0 ? `+${alt.priceDifferenceEur}€` : `${alt.priceDifferenceEur}€`}
+                          Differenza stima listino: {alt.priceDifferenceEur > 0 ? `+${alt.priceDifferenceEur}€` : `${alt.priceDifferenceEur}€`}
                         </span>
                       )}
                     </div>
@@ -512,26 +517,37 @@ export default async function ReviewDetailPage({ params }: ReviewPageProps) {
                       </div>
                     )}
 
-                    <div className="pt-2 flex flex-wrap items-center gap-3">
-                      {targetReview && (
-                        <Link
-                          href={`/recensioni/${targetReview.slug}`}
-                          className="min-h-[44px] px-4 rounded-xl border border-slate-300 text-slate-700 font-semibold text-xs hover:bg-slate-50 flex items-center gap-1.5 transition-colors"
-                        >
-                          <span>Leggi Verifica Alternativa</span>
-                          <span className="material-symbols-outlined text-base" aria-hidden="true">
-                            arrow_forward
+                    <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-t border-emerald-100/60">
+                      <div>
+                        {targetReview ? (
+                          <Link
+                            href={`/recensioni/${targetReview.slug}`}
+                            className="min-h-[44px] px-4 rounded-xl border border-slate-300 text-slate-800 font-semibold text-xs sm:text-sm hover:bg-slate-50 flex items-center justify-center gap-1.5 transition-colors"
+                          >
+                            <span className="material-symbols-outlined text-brand text-lg" aria-hidden="true">
+                              article
+                            </span>
+                            <span>Leggi la Recensione Completa su PCChiaro</span>
+                          </Link>
+                        ) : (
+                          <span className="text-xs text-slate-400 italic">
+                            Scheda dettagliata PCChiaro in lavorazione
                           </span>
-                        </Link>
-                      )}
+                        )}
+                      </div>
+
                       {targetOffer?.affiliateUrl && (
                         <a
                           href={targetOffer.affiliateUrl}
                           target="_blank"
                           rel="noopener noreferrer nofollow"
-                          className="min-h-[44px] px-4 rounded-xl bg-slate-900 text-white font-semibold text-xs hover:bg-slate-800 flex items-center gap-1.5 transition-colors"
+                          className="min-h-[44px] px-5 rounded-xl bg-brand text-white font-semibold text-xs sm:text-sm hover:bg-brand-hover active:scale-95 transition-all flex items-center justify-center gap-2 shadow-sm"
                         >
-                          <span>Vedi su Amazon</span>
+                          {showExactPrices && targetOffer.priceAmountEur ? (
+                            <span>Vedi Offerta su Amazon ({targetOffer.priceAmountEur.toFixed(2)}€)</span>
+                          ) : (
+                            <span>Controlla Offerta su Amazon.it</span>
+                          )}
                           <span className="material-symbols-outlined text-base" aria-hidden="true">
                             open_in_new
                           </span>
