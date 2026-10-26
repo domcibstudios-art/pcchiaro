@@ -13,14 +13,16 @@ describe("Test Fase 3 — Alternative Curate, Prezzi e Fonti", () => {
   sqlite.pragma("foreign_keys = ON");
   const db = drizzle(sqlite, { schema });
 
-  // Inizializza schema tabelle identico alle migrazioni
-  const migrationPath = path.resolve(process.cwd(), "src/db/migrations/0000_smiling_pepper_potts.sql");
-  const migrationSql = fs.readFileSync(migrationPath, "utf-8");
-  // Esegui gli statement rimuovendo i breakpoint
-  const statements = migrationSql.split("--> statement-breakpoint");
-  for (const statement of statements) {
-    if (statement.trim()) {
-      sqlite.exec(statement);
+  // Inizializza schema tabelle eseguendo tutte le migrazioni SQL versionate
+  const migrationsDir = path.resolve(process.cwd(), "src/db/migrations");
+  const migrationFiles = fs.readdirSync(migrationsDir).filter((f) => f.endsWith(".sql")).sort();
+  for (const file of migrationFiles) {
+    const migrationSql = fs.readFileSync(path.join(migrationsDir, file), "utf-8");
+    const statements = migrationSql.split("--> statement-breakpoint");
+    for (const statement of statements) {
+      if (statement.trim()) {
+        sqlite.exec(statement);
+      }
     }
   }
 
@@ -183,5 +185,32 @@ describe("Test Fase 3 — Alternative Curate, Prezzi e Fonti", () => {
 
     source = db.select().from(schema.sources).where(eq(schema.sources.id, "source-1")).get();
     assert.equal(source, undefined, "La fonte deve essere eliminata a cascata alla cancellazione della recensione");
+  });
+
+  test("Conformità Amazon: impostazione dinamica prezzi esatti (default disattivo, commutabile con 1 clic)", () => {
+    // 1. Lettura iniziale: se non presente in tabella, default è false (prezzi esatti nascosti)
+    let setting = db.select().from(schema.siteSettings).where(eq(schema.siteSettings.key, "show_exact_prices")).get();
+    assert.equal(setting, undefined, "Inizialmente non presente in DB");
+
+    // 2. Commutazione a true da parte dell'admin
+    db.insert(schema.siteSettings)
+      .values({
+        key: "show_exact_prices",
+        value: "true",
+        updatedAt: Date.now(),
+      })
+      .run();
+
+    setting = db.select().from(schema.siteSettings).where(eq(schema.siteSettings.key, "show_exact_prices")).get();
+    assert.equal(setting?.value, "true");
+
+    // 3. Commutazione di ritorno a false (modalità conforme Amazon)
+    db.update(schema.siteSettings)
+      .set({ value: "false", updatedAt: Date.now() })
+      .where(eq(schema.siteSettings.key, "show_exact_prices"))
+      .run();
+
+    setting = db.select().from(schema.siteSettings).where(eq(schema.siteSettings.key, "show_exact_prices")).get();
+    assert.equal(setting?.value, "false");
   });
 });

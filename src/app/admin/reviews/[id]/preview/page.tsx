@@ -5,6 +5,7 @@ import { reviews, pcs, curatedAlternatives, sources, priceOffers } from "@/db/sc
 import { eq, asc } from "drizzle-orm";
 import { publishReviewAction, unpublishReviewAction } from "../../actions";
 import { SITE_CONFIG } from "@/config/site";
+import { getShowExactPrices } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,7 @@ export default async function ReviewPreviewPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const showExactPrices = getShowExactPrices();
   const review = db.select().from(reviews).where(eq(reviews.id, id)).get();
 
   if (!review) notFound();
@@ -265,9 +267,16 @@ export default async function ReviewPreviewPage({
           <div className="flex items-center justify-between p-3.5 bg-slate-50 rounded-xl border border-slate-200 font-mono text-xs">
             <div>
               <span className="text-slate-500 block text-[10px]">PREZZO INSERZIONE AMAZON</span>
-              <span className="text-red-700 font-bold text-sm">
-                {review.amazonListingPriceEur ? `~${review.amazonListingPriceEur.toFixed(0)} €` : "N/D"}
-              </span>
+              {showExactPrices ? (
+                <span className="text-red-700 font-bold text-sm">
+                  {review.amazonListingPriceEur ? `~${review.amazonListingPriceEur.toFixed(0)} €` : "N/D"}
+                </span>
+              ) : (
+                <span className="text-slate-800 font-semibold text-xs flex items-center gap-1">
+                  <span>Prezzo variabile</span>
+                  <span className="text-[10px] text-slate-500 font-normal font-sans">(Verifica su Amazon)</span>
+                </span>
+              )}
             </div>
             <div className="text-right">
               <span className="text-slate-500 block text-[10px]">VALORE HARDWARE CONGRUO</span>
@@ -483,7 +492,10 @@ export default async function ReviewPreviewPage({
                 >
                   <div className="space-y-0.5">
                     <div className="font-bold text-sm text-slate-900">
-                      {o.retailer} &bull; {o.priceAmountEur ? `${o.priceAmountEur.toFixed(2)} €` : "Prezzo non specificato"}
+                      {o.retailer} &bull;{" "}
+                      {showExactPrices && o.priceAmountEur
+                        ? `${o.priceAmountEur.toFixed(2)} €`
+                        : "Prezzo variabile in tempo reale"}
                     </div>
                     <div className="text-[11px] text-slate-500 font-mono">
                       Ultima verifica: {new Date(o.lastVerifiedAt).toLocaleDateString("it-IT")}{" "}
@@ -497,7 +509,7 @@ export default async function ReviewPreviewPage({
                     rel="noopener noreferrer"
                     className="px-4 py-2 bg-brand text-white font-semibold text-xs rounded-xl hover:bg-brand-hover inline-flex items-center gap-1.5 self-start sm:self-auto"
                   >
-                    <span>Vedi su {o.retailer}</span>
+                    <span>{SITE_CONFIG.pricing.ctaText}</span>
                     <span className="material-symbols-outlined text-xs" aria-hidden="true">open_in_new</span>
                   </a>
                 </div>

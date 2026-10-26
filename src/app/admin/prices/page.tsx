@@ -4,6 +4,7 @@ import { priceOffers, pcs } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { verifyPriceOfferAction, toggleOfferValidityAction, deletePriceOfferAction } from "./actions";
 import DeleteButton from "@/components/admin/delete-button";
+import { getShowExactPrices, toggleShowExactPricesAction } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,7 @@ export default async function AdminPricesPage({
   const params = await searchParams;
   const now = Date.now();
   const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
+  const showExactPrices = getShowExactPrices();
 
   const allOffers = db
     .select({
@@ -53,6 +55,47 @@ export default async function AdminPricesPage({
           <span className="material-symbols-outlined text-base" aria-hidden="true">add</span>
           Aggiungi Nuova Offerta
         </Link>
+      </div>
+
+      {/* Box Regola di Conformità Normativa Amazon (Configurabile con 1 clic) */}
+      <div
+        className={`p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
+          showExactPrices
+            ? "bg-amber-50 border-amber-300 text-amber-950"
+            : "bg-emerald-50 border-emerald-300 text-emerald-950"
+        }`}
+      >
+        <div className="space-y-1 max-w-2xl">
+          <div className="flex items-center gap-2 font-bold text-sm">
+            <span className="material-symbols-outlined text-xl" aria-hidden="true">
+              {showExactPrices ? "warning" : "verified_user"}
+            </span>
+            <span>
+              Policy Amazon: {showExactPrices ? "Prezzi Esatti Attivi in Frontend" : "Modalità Conforme (Prezzi Esatti Nascosti)"}
+            </span>
+          </div>
+          <p className="text-xs leading-relaxed opacity-90">
+            {showExactPrices
+              ? "I prezzi numerici fissi sono attualmente visibili al pubblico. Assicurati di disporre dell'accesso alle Amazon Creators API per non violare l'accordo operativo sull'aggiornamento in tempo reale."
+              : "I prezzi numerici manuali sono protetti e nascosti agli utenti pubblici: il sito mostra conformemente la CTA 'Controlla il prezzo su Amazon.it'. Nessun rischio di sospensione account."}
+          </p>
+        </div>
+
+        <form action={toggleShowExactPricesAction}>
+          <button
+            type="submit"
+            className={`px-4 py-2 rounded-xl text-xs font-bold font-mono transition-all shadow-sm shrink-0 flex items-center gap-1.5 ${
+              showExactPrices
+                ? "bg-emerald-700 hover:bg-emerald-800 text-white"
+                : "bg-amber-700 hover:bg-amber-800 text-white"
+            }`}
+          >
+            <span className="material-symbols-outlined text-base" aria-hidden="true">
+              {showExactPrices ? "shield" : "visibility"}
+            </span>
+            <span>{showExactPrices ? "Passa a Modalità Conforme (Nascondi)" : "Attiva Prezzi Esatti con 1 Clic"}</span>
+          </button>
+        </form>
       </div>
 
       {/* Filtri */}

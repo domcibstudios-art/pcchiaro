@@ -225,3 +225,14 @@ export const loginAttempts = sqliteTable(
     attemptedAtIdx: index("idx_login_attempts_time").on(table.attemptedAt),
   })
 );
+
+/**
+ * Tabella Impostazioni Sito
+ * Gestisce flag di configurazione dinamici modificabili dall'admin con un clic
+ * (es. conformità normativa prezzi Amazon).
+ */
+export const siteSettings = sqliteTable("site_settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+});

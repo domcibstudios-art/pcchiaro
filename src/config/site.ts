@@ -23,6 +23,16 @@ export const SITE_CONFIG = {
       "Metodo PCChiaro: Analisi indipendente da schede tecniche ufficiali e benchmark pubblici (Nessun test fisico di laboratorio).",
   },
 
+  // Configurazione Policy Prezzi Amazon (Operating Agreement Compliance)
+  pricing: {
+    // Di default i prezzi esatti fissi sono DISATTIVATI per conformità con le policy di affiliazione Amazon (niente cifre statiche non-API).
+    defaultShowExactPrices: false,
+    ctaText: "Controlla il prezzo su Amazon.it",
+    stalePriceNotice: "I prezzi su Amazon variano frequentemente: verifica l'offerta attuale in tempo reale.",
+    realtimeDisclaimer:
+      "I prezzi e la disponibilità dei prodotti sono accurati alla data/ora indicata e sono soggetti a modifiche. Qualsiasi prezzo e informazione sulla disponibilità visualizzati su Amazon.it al momento dell'acquisto si applicheranno a tale acquisto.",
+  },
+
   // Livelli di verdetto standardizzati (esattamente come definiti nel documento strategico)
   verdicts: {
     sconsigliato: {
