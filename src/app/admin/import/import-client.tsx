@@ -1,30 +1,124 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { parseAmazonInputAction, saveImportedPackageAction } from "./actions";
+import { parseAmazonInputAction, saveImportedPackageAction, importCsvContentAction } from "./actions";
 import { ExtractedHardwarePackage } from "@/lib/amazon-extractor";
 import VerdictBadge from "@/components/public/verdict-badge";
+
+interface CsvRowPreview {
+  asin: string;
+  brand: string;
+  modello: string;
+  cpu: string;
+  gpu: string;
+  ram: string;
+  storage: string;
+  verdetto: string;
+  prezzo: string;
+}
+
+function parseCsvPreview(csvText: string): CsvRowPreview[] {
+  const lines = csvText.trim().split(/\r?\n/).filter((l) => l.trim().length > 0);
+  if (lines.length <= 1) return [];
+
+  const rows: CsvRowPreview[] = [];
+  for (let i = 1; i < lines.length; i++) {
+    const rawLine = lines[i];
+    const separator = rawLine.includes(";") ? ";" : ",";
+    const parts = rawLine
+      .split(separator)
+      .map((p) => p.replace(/^"|"$/g, "").replace(/""/g, '"').trim());
+
+    const [
+      asin,
+      brand,
+      modello,
+      ,
+      cpuModello,
+      ,
+      ,
+      gpuModello,
+      ,
+      ,
+      ramGb,
+      ,
+      ,
+      storageGb,
+      ,
+      verdetto,
+      ,
+      ,
+      ,
+      ,
+      ,
+      ,
+      ,
+      ,
+      ,
+      ,
+      prezzoIndicativo,
+    ] = parts;
+
+    if (brand || modello) {
+      rows.push({
+        asin: asin || "-",
+        brand: brand || "-",
+        modello: modello || "-",
+        cpu: cpuModello || "-",
+        gpu: gpuModello || "Integrata",
+        ram: ramGb ? `${ramGb} GB` : "-",
+        storage: storageGb ? `${storageGb} GB` : "-",
+        verdetto: verdetto || "accettabile_base",
+        prezzo: prezzoIndicativo ? `€ ${prezzoIndicativo}` : "Non ind.",
+      });
+    }
+  }
+  return rows;
+}
+
+function downloadCsvTemplate() {
+  const templateContent = `asin;brand;modello;categoria;cpu_modello;cpu_gen;cpu_win11_support;gpu_modello;gpu_tipo;gpu_vram_gb;ram_gb;ram_tipo;ram_canale;storage_gb;storage_tipo;verdetto;titolo_recensione;sommario_intro;semaforo_gaming;note_gaming;semaforo_lavoro;note_lavoro;semaforo_ufficio;note_ufficio;punti_forza;criticita;prezzo_indicativo;amazon_url
+B0GQZDM5WK;HP;OmniBook 3 16-by0001slx;laptop;AMD Ryzen 5 130;Zen 3+ (Rembrandt - Rebrand 2024);1;AMD Radeon 660M;integrated;0;8;LPDDR5;single;512;NVMe;accettabile_base;HP OmniBook 3 16" (Ryzen 5 130 + Radeon 660M);Notebook per produttività e studio con display 16 pollici 2K IPS: silenzioso ed efficiente, ma con soli 8GB di RAM e CPU Zen 3+ del 2022 rimarchiata.;limitato;Grafica integrata Radeon 660M da sole 6 CU: adatta solo a eSports leggeri e giochi 2D; inadeguata per 1080p moderno nativo.;limitato;6 core / 12 thread veloci per calcolo e multitasking, ma fortemente limitato dagli 8GB di RAM per rendering e video editing.;idoneo;Ottimo per Office, studio, navigazione web intensiva e streaming video grazie all'ampio schermo 16 pollici 2K IPS nitido.;Schermo 16 pollici 2K IPS 300 nits antiriflesso molto confortevole | Processore 6 core efficiente con supporto nativo a Windows 11 | SSD NVMe veloce da 512GB;Attenzione al rebrand: il Ryzen 5 130 è vecchio silicio Zen 3+ del 2022 con prestazioni e NPU inferiori a Zen 4/5 | Soli 8GB di RAM: limite stringente per carichi futuri e multitasking pesante | Grafica integrata con sole 6 CU RDNA2 inadatta al gaming 3D moderno;599.99;https://www.amazon.it/HP-16-by0001slx-integrata-Antiriflesso-Portatile/dp/B0GQZDM5WK`;
+
+  const blob = new Blob([templateContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.setAttribute("href", url);
+  link.setAttribute("download", "pcchiaro_candidati_template.csv");
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
 
 export default function ImportClient() {
   const router = useRouter();
 
   // Stato input iniziale
-  const [activeTab, setActiveTab] = useState<"url" | "text" | "json">("url");
+  const [activeTab, setActiveTab] = useState<"csv" | "url" | "text" | "json">("csv");
   const [urlInput, setUrlInput] = useState("");
   const [textInput, setTextInput] = useState("");
   const [jsonInput, setJsonInput] = useState("");
+  const [csvInput, setCsvInput] = useState("");
+  const [csvFileName, setCsvFileName] = useState("");
 
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Dati estratti pronti per la revisione
+  // Dati estratti pronti per la revisione (modalità singola)
   const [extractedData, setExtractedData] = useState<ExtractedHardwarePackage | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [successInfo, setSuccessInfo] = useState<{ reviewId: string; slug: string } | null>(null);
+  const [csvSuccessCount, setCsvSuccessCount] = useState<number | null>(null);
 
-  // Esegue l'estrazione iniziale
+  // Calcolo righe CSV per anteprima
+  const csvParsedRows = useMemo(() => {
+    if (!csvInput) return [];
+    return parseCsvPreview(csvInput);
+  }, [csvInput]);
+
+  // Esegue l'estrazione singola
   async function handleExtract(e: React.FormEvent) {
     e.preventDefault();
     setIsLoading(true);
@@ -59,6 +153,45 @@ export default function ImportClient() {
     reader.readAsText(file);
   }
 
+  // Gestione caricamento file CSV locale
+  function handleCsvUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setCsvFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      setCsvInput(content);
+      setErrorMsg(null);
+      setCsvSuccessCount(null);
+    };
+    reader.readAsText(file);
+  }
+
+  // Importazione massiva dal file CSV
+  async function handleCsvImportSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!csvInput.trim()) {
+      setErrorMsg("Seleziona un file CSV o incolla il testo prima di importare.");
+      return;
+    }
+
+    setIsLoading(true);
+    setErrorMsg(null);
+    setCsvSuccessCount(null);
+
+    const res = await importCsvContentAction(csvInput);
+    setIsLoading(false);
+
+    if (!res.success) {
+      setErrorMsg(res.error || "Errore durante l'importazione del CSV.");
+      return;
+    }
+
+    setCsvSuccessCount(res.importedCount || 0);
+  }
+
   // Salva il pacchetto completo nel database SQLite
   async function handleSave() {
     if (!extractedData) return;
@@ -85,15 +218,31 @@ export default function ImportClient() {
       <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-5">
         <div>
           <h2 className="font-headline font-bold text-lg text-slate-900">
-            Sorgente Dati Inserzione Amazon.it
+            Importazione Hardware &amp; Recensioni nel Catalogo
           </h2>
           <p className="text-xs text-slate-500 mt-1">
-            Scegli come fornire i dati dell&apos;inserzione. Il sistema estrarrà automaticamente la configurazione tecnica, le fonti e genererà una bozza di recensione.
+            Scegli la modalità di inserimento: carica il file CSV preparato con Excel in locale, oppure inserisci un singolo link Amazon o testo tecnico.
           </p>
         </div>
 
         {/* Tab di selezione */}
-        <div className="flex border-b border-slate-200 gap-4 text-sm font-semibold">
+        <div className="flex flex-wrap border-b border-slate-200 gap-2 sm:gap-4 text-xs sm:text-sm font-semibold">
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab("csv");
+              setErrorMsg(null);
+            }}
+            className={`pb-3 border-b-2 transition-colors flex items-center gap-1.5 ${
+              activeTab === "csv"
+                ? "border-brand text-brand"
+                : "border-transparent text-slate-500 hover:text-slate-800"
+            }`}
+          >
+            <span className="material-symbols-outlined text-lg" aria-hidden="true">table_view</span>
+            Carica File CSV / Excel (.csv)
+          </button>
+
           <button
             type="button"
             onClick={() => {
@@ -143,111 +292,296 @@ export default function ImportClient() {
           </button>
         </div>
 
-        {/* Form di input */}
-        <form onSubmit={handleExtract} className="space-y-4">
-          {activeTab === "url" && (
-            <div>
-              <label htmlFor="urlInput" className="block text-xs font-semibold text-slate-700 mb-1">
-                URL dell&apos;inserzione Amazon.it:
-              </label>
-              <div className="flex gap-2">
-                <input
-                  id="urlInput"
-                  type="url"
-                  value={urlInput}
-                  onChange={(e) => setUrlInput(e.target.value)}
-                  placeholder="https://www.amazon.it/dp/B0..."
-                  required
-                  className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand font-mono"
-                />
+        {/* NOTIFICA SUCCESSO IMPORTAZIONE CSV */}
+        {csvSuccessCount !== null && (
+          <div className="bg-emerald-50 border border-emerald-300 rounded-2xl p-6 shadow-sm space-y-3">
+            <div className="flex items-center gap-2 text-emerald-950 font-bold text-base">
+              <span className="material-symbols-outlined text-emerald-600 text-2xl" aria-hidden="true">
+                check_circle
+              </span>
+              Importazione CSV Completata con Successo!
+            </div>
+            <p className="text-xs sm:text-sm text-emerald-900 leading-relaxed">
+              Sono state importate con successo <strong>{csvSuccessCount} schede PC</strong> con relative bozze di recensione, fonti e offerte nel database SQLite. Tutti i record sono stati salvati come <strong>BOZZA (draft)</strong>, pronti per essere revisionati.
+            </p>
+            <div className="flex flex-wrap items-center gap-3 pt-2">
+              <Link
+                href="/admin/pcs"
+                className="min-h-[44px] px-5 rounded-xl bg-emerald-700 text-white font-semibold text-xs sm:text-sm hover:bg-emerald-800 transition-colors flex items-center gap-1.5"
+              >
+                <span className="material-symbols-outlined text-base" aria-hidden="true">laptop_mac</span>
+                <span>Visualizza Catalogo PC ({csvSuccessCount} nuovi)</span>
+              </Link>
+              <Link
+                href="/admin/reviews"
+                className="min-h-[44px] px-5 rounded-xl border border-emerald-300 bg-white text-emerald-900 font-semibold text-xs sm:text-sm hover:bg-emerald-50 transition-colors flex items-center gap-1.5"
+              >
+                <span className="material-symbols-outlined text-base" aria-hidden="true">rate_review</span>
+                <span>Gestione Recensioni Bozza</span>
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {/* CONTENUTO SCHEDA CSV */}
+        {activeTab === "csv" && (
+          <form onSubmit={handleCsvImportSubmit} className="space-y-5">
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 sm:p-5 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h3 className="font-semibold text-sm text-slate-900 flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-brand text-lg" aria-hidden="true">upload_file</span>
+                    Carica il file CSV elaborato
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Seleziona il file <code className="bg-slate-200 px-1 py-0.5 rounded text-slate-800 font-mono text-[11px]">pcchiaro_candidati_template.csv</code> o un tuo file CSV modificato con Excel.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={downloadCsvTemplate}
+                  className="min-h-[36px] px-3.5 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 text-xs font-semibold flex items-center gap-1.5 shrink-0 transition-colors"
+                >
+                  <span className="material-symbols-outlined text-base text-brand" aria-hidden="true">download</span>
+                  Scarica Modello CSV per Excel
+                </button>
               </div>
-              <p className="text-[11px] text-slate-400 mt-1.5">
-                💡 Se Amazon restituisce un controllo CAPTCHA temporaneo, usa la scheda &ldquo;Incolla HTML o Testo&rdquo;.
-              </p>
-            </div>
-          )}
 
-          {activeTab === "text" && (
-            <div>
-              <label htmlFor="textInput" className="block text-xs font-semibold text-slate-700 mb-1">
-                Incolla il codice HTML o il testo della scheda tecnica Amazon:
-              </label>
-              <textarea
-                id="textInput"
-                rows={6}
-                value={textInput}
-                onChange={(e) => setTextInput(e.target.value)}
-                placeholder="Incolla qui il testo dell'inserzione, la tabella 'Dettagli tecnici' o il codice sorgente della pagina salvata..."
-                required
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono focus:outline-none focus:ring-2 focus:ring-brand"
-              />
-            </div>
-          )}
-
-          {activeTab === "json" && (
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Carica file .json estratto tramite CLI (`extract-amazon.ts`):
-                </label>
+              <div className="mt-2">
                 <input
                   type="file"
-                  accept=".json"
-                  onChange={handleFileUpload}
-                  className="text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-brand file:text-white hover:file:bg-brand-hover cursor-pointer"
+                  accept=".csv,.txt"
+                  onChange={handleCsvUpload}
+                  className="text-xs text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-brand file:text-white hover:file:bg-brand-hover cursor-pointer"
                 />
+                {csvFileName && (
+                  <p className="text-xs text-emerald-700 font-medium mt-2 flex items-center gap-1">
+                    <span className="material-symbols-outlined text-base" aria-hidden="true">check</span>
+                    File caricato: <strong>{csvFileName}</strong>
+                  </p>
+                )}
               </div>
+            </div>
+
+            {/* Incolla testo alternativo */}
+            <div>
+              <label htmlFor="csvInput" className="block text-xs font-semibold text-slate-700 mb-1">
+                Oppure incolla direttamente il contenuto del file CSV:
+              </label>
+              <textarea
+                id="csvInput"
+                rows={4}
+                value={csvInput}
+                onChange={(e) => {
+                  setCsvInput(e.target.value);
+                  setErrorMsg(null);
+                  setCsvSuccessCount(null);
+                }}
+                placeholder="asin;brand;modello;categoria;cpu_modello;..."
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono focus:outline-none focus:ring-2 focus:ring-brand"
+              />
+            </div>
+
+            {/* Anteprima candidati estratti dal CSV */}
+            {csvParsedRows.length > 0 && (
+              <div className="border border-slate-200 rounded-xl overflow-hidden space-y-0">
+                <div className="bg-slate-100 px-4 py-2.5 border-b border-slate-200 flex items-center justify-between text-xs">
+                  <span className="font-bold text-slate-800 flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-base text-brand" aria-hidden="true">preview</span>
+                    Anteprima: {csvParsedRows.length} {csvParsedRows.length === 1 ? "PC candidato rilevato" : "PC candidati rilevati"}
+                  </span>
+                  <span className="text-slate-500">Tutti verranno importati in stato BOZZA</span>
+                </div>
+
+                <div className="overflow-x-auto max-h-72">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 text-slate-600 border-b border-slate-200 sticky top-0">
+                      <tr>
+                        <th className="py-2 px-3 font-semibold">ASIN</th>
+                        <th className="py-2 px-3 font-semibold">Brand &amp; Modello</th>
+                        <th className="py-2 px-3 font-semibold">CPU</th>
+                        <th className="py-2 px-3 font-semibold">GPU</th>
+                        <th className="py-2 px-3 font-semibold">RAM / SSD</th>
+                        <th className="py-2 px-3 font-semibold">Verdetto</th>
+                        <th className="py-2 px-3 font-semibold">Prezzo</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-mono text-[11px]">
+                      {csvParsedRows.map((row, idx) => (
+                        <tr key={idx} className="hover:bg-slate-50/80">
+                          <td className="py-2 px-3 font-semibold text-slate-800">{row.asin}</td>
+                          <td className="py-2 px-3 font-sans font-medium text-slate-900">
+                            {row.brand} {row.modello}
+                          </td>
+                          <td className="py-2 px-3 text-slate-700">{row.cpu}</td>
+                          <td className="py-2 px-3 text-slate-700">{row.gpu}</td>
+                          <td className="py-2 px-3 text-slate-600">
+                            {row.ram} / {row.storage}
+                          </td>
+                          <td className="py-2 px-3 font-sans">
+                            <VerdictBadge verdict={row.verdetto as any} size="sm" />
+                          </td>
+                          <td className="py-2 px-3 font-semibold text-slate-900">{row.prezzo}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {errorMsg && (
+              <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-xs text-red-900 flex items-start gap-2">
+                <span className="material-symbols-outlined text-red-700 text-lg shrink-0 mt-0.5" aria-hidden="true">
+                  error
+                </span>
+                <span>{errorMsg}</span>
+              </div>
+            )}
+
+            <div className="flex items-center gap-3 pt-1">
+              <button
+                type="submit"
+                disabled={isLoading || !csvInput.trim()}
+                className="min-h-[44px] px-6 rounded-xl bg-brand text-white font-semibold text-sm hover:bg-brand-hover active:scale-95 transition-all flex items-center gap-2 shadow-sm disabled:opacity-50"
+              >
+                <span className="material-symbols-outlined text-lg" aria-hidden="true">
+                  {isLoading ? "hourglass_empty" : "publish"}
+                </span>
+                <span>
+                  {isLoading
+                    ? "Importazione nel database in corso..."
+                    : csvParsedRows.length > 0
+                    ? `Importa ${csvParsedRows.length} ${csvParsedRows.length === 1 ? "Scheda" : "Schede"} dal CSV nel Catalogo`
+                    : "Importa Schede dal CSV"}
+                </span>
+              </button>
+
+              {csvInput && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCsvInput("");
+                    setCsvFileName("");
+                    setCsvSuccessCount(null);
+                  }}
+                  className="text-xs text-slate-500 hover:text-slate-800 underline"
+                >
+                  Svuota selezione
+                </button>
+              )}
+            </div>
+          </form>
+        )}
+
+        {/* CONTENUTO SCHEDE SINGOLE (URL / TESTO / JSON) */}
+        {activeTab !== "csv" && (
+          <form onSubmit={handleExtract} className="space-y-4">
+            {activeTab === "url" && (
               <div>
-                <label htmlFor="jsonInput" className="block text-xs font-semibold text-slate-700 mb-1">
-                  Oppure incolla il contenuto JSON grezzo:
+                <label htmlFor="urlInput" className="block text-xs font-semibold text-slate-700 mb-1">
+                  URL dell&apos;inserzione Amazon.it:
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    id="urlInput"
+                    type="url"
+                    value={urlInput}
+                    onChange={(e) => setUrlInput(e.target.value)}
+                    placeholder="https://www.amazon.it/dp/B0..."
+                    required
+                    className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand font-mono"
+                  />
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1.5">
+                  💡 Se Amazon restituisce un controllo CAPTCHA temporaneo, usa la scheda &ldquo;Incolla HTML o Testo&rdquo; oppure il &ldquo;Carica File CSV&rdquo;.
+                </p>
+              </div>
+            )}
+
+            {activeTab === "text" && (
+              <div>
+                <label htmlFor="textInput" className="block text-xs font-semibold text-slate-700 mb-1">
+                  Incolla il codice HTML o il testo della scheda tecnica Amazon:
                 </label>
                 <textarea
-                  id="jsonInput"
-                  rows={4}
-                  value={jsonInput}
-                  onChange={(e) => setJsonInput(e.target.value)}
-                  placeholder='{"pc": {...}, "review": {...}, "sources": [...]}'
-                  className="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono focus:outline-none focus:ring-2 focus:ring-brand"
+                  id="textInput"
+                  rows={6}
+                  value={textInput}
+                  onChange={(e) => setTextInput(e.target.value)}
+                  placeholder="Incolla qui il testo dell'inserzione, la tabella 'Dettagli tecnici' o il codice sorgente della pagina salvata..."
+                  required
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono focus:outline-none focus:ring-2 focus:ring-brand"
                 />
               </div>
-            </div>
-          )}
-
-          {errorMsg && (
-            <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-xs text-red-900 flex items-start gap-2">
-              <span className="material-symbols-outlined text-red-700 text-lg shrink-0 mt-0.5" aria-hidden="true">
-                error
-              </span>
-              <span>{errorMsg}</span>
-            </div>
-          )}
-
-          <div className="flex items-center gap-3 pt-1">
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="min-h-[44px] px-6 rounded-xl bg-brand text-white font-semibold text-sm hover:bg-brand-hover active:scale-95 transition-all flex items-center gap-2 shadow-sm disabled:opacity-50"
-            >
-              <span className="material-symbols-outlined text-lg" aria-hidden="true">
-                {isLoading ? "hourglass_empty" : "auto_fix_high"}
-              </span>
-              <span>{isLoading ? "Analisi ed Estrazione in corso..." : "Analizza ed Estrai Specifiche"}</span>
-            </button>
-
-            {extractedData && (
-              <button
-                type="button"
-                onClick={() => setExtractedData(null)}
-                className="text-xs text-slate-500 hover:text-slate-800 underline"
-              >
-                Cancella e ricomincia
-              </button>
             )}
-          </div>
-        </form>
+
+            {activeTab === "json" && (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Carica file .json estratto tramite CLI (`extract-amazon.ts`):
+                  </label>
+                  <input
+                    type="file"
+                    accept=".json"
+                    onChange={handleFileUpload}
+                    className="text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-brand file:text-white hover:file:bg-brand-hover cursor-pointer"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="jsonInput" className="block text-xs font-semibold text-slate-700 mb-1">
+                    Oppure incolla il contenuto JSON grezzo:
+                  </label>
+                  <textarea
+                    id="jsonInput"
+                    rows={4}
+                    value={jsonInput}
+                    onChange={(e) => setJsonInput(e.target.value)}
+                    placeholder='{"pc": {...}, "review": {...}, "sources": [...]}'
+                    className="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono focus:outline-none focus:ring-2 focus:ring-brand"
+                  />
+                </div>
+              </div>
+            )}
+
+            {errorMsg && (
+              <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-xs text-red-900 flex items-start gap-2">
+                <span className="material-symbols-outlined text-red-700 text-lg shrink-0 mt-0.5" aria-hidden="true">
+                  error
+                </span>
+                <span>{errorMsg}</span>
+              </div>
+            )}
+
+            <div className="flex items-center gap-3 pt-1">
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="min-h-[44px] px-6 rounded-xl bg-brand text-white font-semibold text-sm hover:bg-brand-hover active:scale-95 transition-all flex items-center gap-2 shadow-sm disabled:opacity-50"
+              >
+                <span className="material-symbols-outlined text-lg" aria-hidden="true">
+                  {isLoading ? "hourglass_empty" : "auto_fix_high"}
+                </span>
+                <span>{isLoading ? "Analisi ed Estrazione in corso..." : "Analizza ed Estrai Specifiche"}</span>
+              </button>
+
+              {extractedData && (
+                <button
+                  type="button"
+                  onClick={() => setExtractedData(null)}
+                  className="text-xs text-slate-500 hover:text-slate-800 underline"
+                >
+                  Cancella e ricomincia
+                </button>
+              )}
+            </div>
+          </form>
+        )}
       </div>
 
-      {/* NOTIFICA SUCCESSO SALVATAGGIO */}
+      {/* NOTIFICA SUCCESSO SALVATAGGIO SINGOLO */}
       {successInfo && (
         <div className="bg-emerald-50 border border-emerald-300 rounded-2xl p-6 shadow-sm space-y-3">
           <div className="flex items-center gap-2 text-emerald-950 font-bold text-base">
@@ -278,7 +612,7 @@ export default function ImportClient() {
         </div>
       )}
 
-      {/* ANTEPRIMA COMPLETA DEL PACCHETTO ESTRATTO (MODIFICABILE DALL'ADMIN) */}
+      {/* ANTEPRIMA COMPLETA DEL PACCHETTO ESTRATTO (MODIFICABILE DALL'ADMIN - MODALITÀ SINGOLA) */}
       {extractedData && !successInfo && (
         <div className="space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-3">

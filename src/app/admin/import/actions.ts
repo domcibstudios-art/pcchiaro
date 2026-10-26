@@ -222,3 +222,171 @@ export async function saveImportedPackageAction(pkg: ExtractedHardwarePackage): 
     return { success: false, error: `Errore durante il salvataggio nel database: ${msg}` };
   }
 }
+
+/**
+ * Server Action per importare direttamente un file o testo CSV (modificato in Excel)
+ * creando contemporaneamente PC, Recensioni bozza e Offerte nel database.
+ */
+export async function importCsvContentAction(csvText: string): Promise<{
+  success: boolean;
+  error?: string;
+  importedCount?: number;
+}> {
+  await requireAdmin();
+
+  const trimmed = csvText.trim();
+  if (!trimmed) {
+    return { success: false, error: "Il file o testo CSV fornito è vuoto." };
+  }
+
+  const lines = trimmed.split(/\r?\n/).filter((l) => l.trim().length > 0);
+  if (lines.length <= 1) {
+    return {
+      success: false,
+      error: "Il file CSV non contiene righe di dati valide oltre all'intestazione.",
+    };
+  }
+
+  const now = Date.now();
+  let importedCount = 0;
+
+  try {
+    db.transaction((tx) => {
+      // Salta la prima riga di intestazione
+      for (let i = 1; i < lines.length; i++) {
+        const rawLine = lines[i];
+        const separator = rawLine.includes(";") ? ";" : ",";
+        const parts = rawLine
+          .split(separator)
+          .map((p) => p.replace(/^"|"$/g, "").replace(/""/g, '"').trim());
+
+        const [
+          asin,
+          brand,
+          modello,
+          categoria,
+          cpuModello,
+          cpuGen,
+          cpuWin11,
+          gpuModello,
+          gpuTipo,
+          gpuVram,
+          ramGb,
+          ramTipo,
+          ramCanale,
+          storageGb,
+          storageTipo,
+          verdetto,
+          titoloRecensione,
+          sommarioIntro,
+          semaforoGaming,
+          noteGaming,
+          semaforoLavoro,
+          noteLavoro,
+          semaforoUfficio,
+          noteUfficio,
+          puntiForza,
+          criticita,
+          prezzoIndicativo,
+          amazonUrl,
+        ] = parts;
+
+        if (!brand || !modello || !cpuModello) continue;
+
+        const pcId = crypto.randomUUID();
+        const reviewId = crypto.randomUUID();
+        const slug =
+          (titoloRecensione || modello)
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-+|-+$/g, "")
+            .slice(0, 60) + (asin ? `-${asin.toLowerCase()}` : `-${Date.now().toString(36)}`);
+
+        const strengthsArray = puntiForza
+          ? puntiForza.split("|").map((s) => s.trim()).filter(Boolean)
+          : [];
+        const weaknessesArray = criticita
+          ? criticita.split("|").map((s) => s.trim()).filter(Boolean)
+          : [];
+
+        tx.insert(pcs)
+          .values({
+            id: pcId,
+            brand: brand || "Brand Generico",
+            modelName: modello,
+            exactConfig: `${cpuModello} / ${gpuModello || "Integrata"} / ${ramGb || 16}GB / ${storageGb || 512}GB`,
+            category: (categoria as any) || "desktop_office",
+            cpuModel: cpuModello,
+            cpuGen: cpuGen || null,
+            cpuWin11Support: cpuWin11 === "0" ? 0 : 1,
+            gpuModel: gpuModello || "Integrata",
+            gpuVramGb: gpuVram ? parseInt(gpuVram, 10) : null,
+            gpuType: (gpuTipo as any) || "integrated",
+            ramGb: parseInt(ramGb, 10) || 16,
+            ramType: ramTipo || "DDR4",
+            ramChannel: (ramCanale as any) || "dual",
+            storageType: storageTipo || "NVMe",
+            storageCapacityGb: parseInt(storageGb, 10) || 512,
+            osInstalled: "Windows 11",
+            osOfficialSupport: cpuWin11 === "0" ? 0 : 1,
+            editorialStatus: "draft",
+            createdAt: now,
+            updatedAt: now,
+          })
+          .run();
+
+        tx.insert(reviews)
+          .values({
+            id: reviewId,
+            pcId: pcId,
+            slug,
+            title: titoloRecensione || modello,
+            summaryIntro: sommarioIntro || `Bozza importata da CSV per ${brand} ${modello}.`,
+            verdict: (verdetto as any) || "accettabile_base",
+            evidenceLevel: "specifiche_dichiarate",
+            strengths: JSON.stringify(strengthsArray),
+            weaknesses: JSON.stringify(weaknessesArray),
+            ratingGaming: (semaforoGaming as any) || "limitato",
+            notesGaming: noteGaming || "",
+            ratingWork: (semaforoLavoro as any) || "limitato",
+            notesWork: noteLavoro || "",
+            ratingOffice: (semaforoUfficio as any) || "idoneo",
+            notesOffice: noteUfficio || "",
+            status: "draft",
+            updatedAt: now,
+          })
+          .run();
+
+        if (amazonUrl || asin) {
+          tx.insert(priceOffers)
+            .values({
+              id: crypto.randomUUID(),
+              pcId: pcId,
+              retailer: "Amazon.it",
+              affiliateUrl: amazonUrl || `https://www.amazon.it/dp/${asin}`,
+              asin: asin || null,
+              priceAmountEur: prezzoIndicativo ? parseFloat(prezzoIndicativo.replace(",", ".")) : null,
+              currency: "EUR",
+              dataSource: "csv_import",
+              isValid: 1,
+              lastVerifiedAt: now,
+              createdAt: now,
+            })
+            .run();
+        }
+
+        importedCount++;
+      }
+    });
+
+    revalidatePath("/admin");
+    revalidatePath("/admin/pcs");
+    revalidatePath("/admin/reviews");
+    revalidatePath("/admin/prices");
+
+    return { success: true, importedCount };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { success: false, error: `Errore durante l'importazione del CSV: ${msg}` };
+  }
+}
