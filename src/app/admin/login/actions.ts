@@ -27,6 +27,10 @@ export async function loginAction(prevState: { error?: string } | undefined, for
   const expectedUsername = process.env.ADMIN_USERNAME || "admin";
   let expectedHash = process.env.ADMIN_PASSWORD_HASH;
   if (!expectedHash || expectedHash.startsWith("placeholder_")) {
+    if (process.env.NODE_ENV === "production") {
+      console.error("FATAL: ADMIN_PASSWORD_HASH non configurato in ambiente di produzione.");
+      return { error: "Configurazione di sicurezza incompleta: imposta ADMIN_PASSWORD_HASH nel file delle variabili d'ambiente." };
+    }
     expectedHash = DEV_DEFAULT_HASH;
   }
 

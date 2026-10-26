@@ -48,6 +48,34 @@ export async function parseAmazonInputAction(
       return { success: false, error: "Inserisci un URL valido che inizia con http:// o https://" };
     }
 
+    // Protezione SSRF (Server-Side Request Forgery): accetta solo domini Amazon ufficiali
+    try {
+      const parsedUrl = new URL(trimmed);
+      const host = parsedUrl.hostname.toLowerCase();
+      const isAllowedHost =
+        host === "amazon.it" ||
+        host.endsWith(".amazon.it") ||
+        host === "amzn.to" ||
+        host.endsWith(".amzn.to") ||
+        host === "amazon.com" ||
+        host.endsWith(".amazon.com") ||
+        host === "amazon.de" ||
+        host.endsWith(".amazon.de") ||
+        host === "amazon.fr" ||
+        host.endsWith(".amazon.fr") ||
+        host === "amazon.es" ||
+        host.endsWith(".amazon.es");
+
+      if (!isAllowedHost) {
+        return {
+          success: false,
+          error: "Per motivi di sicurezza (SSRF), l'importazione automatica via URL è limitata esclusivamente ai domini ufficiali Amazon (amazon.it, amzn.to, ecc.).",
+        };
+      }
+    } catch {
+      return { success: false, error: "URL non valido." };
+    }
+
     try {
       const res = await fetch(trimmed, {
         headers: {

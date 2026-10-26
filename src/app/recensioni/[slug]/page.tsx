@@ -184,12 +184,16 @@ export default async function ReviewDetailPage({ params }: ReviewPageProps) {
       {/* SCHEMA.ORG STRUCTURED DATA (JSON-LD) PER GOOGLE */}
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(reviewSchema) }}
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(reviewSchema).replace(/</g, "\\u003c"),
+        }}
       />
       {faqSchema && (
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(faqSchema).replace(/</g, "\\u003c"),
+          }}
         />
       )}
 

@@ -87,6 +87,7 @@ export default async function AdminLayout({
             <Link
               href="/"
               target="_blank"
+              rel="noopener noreferrer"
               className="text-xs text-slate-400 hover:text-white flex items-center gap-1 transition-colors px-2.5 py-1.5 rounded-lg hover:bg-slate-800"
             >
               <span className="material-symbols-outlined text-sm" aria-hidden="true">open_in_new</span>
