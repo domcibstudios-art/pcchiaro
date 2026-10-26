@@ -9,6 +9,13 @@ import {
 } from "../lib/auth";
 
 describe("Modulo Autenticazione e Sicurezza", () => {
+  test("Verifica credenziali predefinite di sviluppo (admin / admin12345)", async () => {
+    const devHash =
+      "706a99f77762972ef0993de8ccf2b783:df532feffe509a6d0ef8f0c253abbdd8d22b653dbdf11b9f2bdcea6b2f7664d9674b5ec00e395f24cc07c3ddcffc1a17bb6d74b93367cd72e5f25c68f1cabea6";
+    const matches = await verifyPassword("admin12345", devHash);
+    assert.equal(matches, true, "admin12345 deve corrispondere al dev hash");
+  });
+
   test("Hashing e verifica password con Scrypt", async () => {
     const password = "SuperSecretPassword123!";
     const hash = await hashPassword(password);

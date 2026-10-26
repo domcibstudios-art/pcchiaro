@@ -25,7 +25,10 @@ export async function loginAction(prevState: { error?: string } | undefined, for
   }
 
   const expectedUsername = process.env.ADMIN_USERNAME || "admin";
-  const expectedHash = process.env.ADMIN_PASSWORD_HASH || DEV_DEFAULT_HASH;
+  let expectedHash = process.env.ADMIN_PASSWORD_HASH;
+  if (!expectedHash || expectedHash.startsWith("placeholder_")) {
+    expectedHash = DEV_DEFAULT_HASH;
+  }
 
   // 2. Controllo username
   if (!username || username !== expectedUsername) {
