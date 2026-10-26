@@ -1,0 +1,78 @@
+{
+  "extractedAt": 1793026578948,
+  "sourceUrl": "https://www.amazon.it/HP-16-by0001slx-integrata-Antiriflesso-Portatile/dp/B0GQZDM5WK",
+  "asin": "B0GQZDM5WK",
+  "pc": {
+    "brand": "HyperX con illuminazione della tastiera RGB",
+    "modelName": "HP OmniBook 3 16-by0001slx, Notebook, AMD Ryzen 5 130, 8 GB RAM, 512 GB, AMD Rad",
+    "exactConfig": "AMD Ryzen 5 130 / AMD Radeon 660M / 8GB DDR4 / 512GB NVMe",
+    "category": "laptop",
+    "cpuModel": "AMD Ryzen 5 130",
+    "cpuGen": "Zen 3+ (Rembrandt) [Lancio Reale: 2022 — Rebrand 2024]",
+    "cpuCoresThreads": null,
+    "cpuWin11Support": 1,
+    "gpuModel": "AMD Radeon 660M",
+    "gpuVramGb": null,
+    "gpuType": "integrated",
+    "gpuDlssFsr": "FSR",
+    "ramGb": 8,
+    "ramType": "DDR4",
+    "ramChannel": "single",
+    "ramSpeedMhz": null,
+    "storageType": "NVMe",
+    "storageCapacityGb": 512,
+    "storageDetails": "NVMe 512GB",
+    "motherboardChipset": null,
+    "psuWattage": null,
+    "psuRating": null,
+    "osInstalled": "Windows 11 Pro",
+    "osOfficialSupport": 1,
+    "unverifiedSpecs": [],
+    "editorialStatus": "draft"
+  },
+  "review": {
+    "slug": "hp-omnibook-3-16-by0001slx-notebook-amd-ryzen-5-130-8-gb-ram-b0gqzdm5wk",
+    "title": "HP OmniBook 3 16-by0001slx, Notebook, AMD Ryzen 5 130, 8 GB RAM, 512 GB, AMD Radeon 660M integrata, ",
+    "summaryIntro": "Analisi indipendente della configurazione HyperX con illuminazione della tastiera RGB con AMD Ryzen 5 130 e AMD Radeon 660M: verifica di compatibilità, banda memoria e limiti d'uso reali.",
+    "whyPositiveReviews": "Molti acquirenti lasciano una recensione entusiasta nelle prime 24 ore perché il PC si avvia rapidamente grazie all'SSD e presenta un case accattivante con ventole RGB, senza avere gli strumenti tecnici per verificare che la CPU è datata o che la RAM lavora a banda dimezzata.",
+    "strengths": [
+      "Piattaforma con Zen 3+ (Rembrandt) [Lancio Reale: 2022 — Rebrand 2024] compatibile con Windows 11 nativo."
+    ],
+    "weaknesses": [
+      "Attenzione: venduto con numerazione a tre cifre che simula un'architettura nuova, ma utilizza silicio del 2022 con IPC e NPU inferiori a Zen 4/5.",
+      "Spesso spacciata per 'grafica Radeon potente per gaming', ma ha solo 6 CU RDNA2 ed è stata introdotta nel 2022. Non sostituisce una scheda video dedicata.",
+      "RAM configurata in singolo canale: banda passante dimezzata con perdita fino al 20-25% di frame rate."
+    ],
+    "evidenceLevel": "specifiche_dichiarate",
+    "verdict": "accettabile_base",
+    "ratingGaming": "limitato",
+    "notesGaming": "Risoluzione 1080p raggiungibile solo scendendo a compromessi grafici su dettagli e texture a causa della memoria limitata.",
+    "ratingWork": "limitato",
+    "notesWork": "Tempi di esportazione video e rendering rallentati dall'assenza di accelerazione dedicata.",
+    "ratingOffice": "idoneo",
+    "notesOffice": "Pienamente adeguato per Office, navigazione web con molte schede aperte e streaming video fluido.",
+    "status": "draft"
+  },
+  "offer": {
+    "retailer": "Amazon.it",
+    "affiliateUrl": "https://www.amazon.it/HP-16-by0001slx-integrata-Antiriflesso-Portatile/dp/B0GQZDM5WK",
+    "asin": "B0GQZDM5WK",
+    "priceAmountEur": 57.19,
+    "currency": "EUR",
+    "dataSource": "manual_check"
+  },
+  "sources": [
+    {
+      "sourceName": "Inserzione Commerciale Amazon.it",
+      "sourceType": "inserzione_commerciale",
+      "url": "https://www.amazon.it/HP-16-by0001slx-integrata-Antiriflesso-Portatile/dp/B0GQZDM5WK",
+      "notes": "Scheda tecnica e dichiarazioni ufficiali del venditore sull'inserzione Amazon."
+    },
+    {
+      "sourceName": "Datasheet Ufficiale AMD Ryzen 5 130",
+      "sourceType": "produttore",
+      "url": "https://www.amd.com/it/search.html#q=AMD%20Ryzen%205%20130",
+      "notes": "Specifiche architetturali, anno di rilascio e compatibilità socket dal produttore del processore."
+    }
+  ]
+}

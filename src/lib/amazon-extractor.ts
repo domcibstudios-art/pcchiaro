@@ -4,6 +4,8 @@
  * una bozza completa (PC, Recensione, Fonti, Offerta) pronta per la revisione.
  */
 
+import { lookupCpu, lookupGpu } from "./hardware-lookup";
+
 export interface ExtractedHardwarePackage {
   extractedAt: number;
   sourceUrl?: string;
@@ -96,12 +98,34 @@ function cleanText(text: string): string {
 /**
  * Analizza le specifiche della CPU per identificare generazione e supporto Windows 11
  */
-function analyzeCpu(rawCpu: string): {
+function analyzeCpu(rawCpu: string, fullContextText: string = ""): {
   model: string;
   gen: string;
   win11: number;
+  cores?: number | null;
+  threads?: number | null;
+  isRebadge?: boolean;
+  rebadgeNotes?: string | null;
+  antiTrapWarning?: string | null;
 } {
   const cpu = rawCpu.trim();
+
+  // 1. Cerca nel database storico hardware locale
+  const dbMatch = lookupCpu(cpu) || lookupCpu(fullContextText);
+  if (dbMatch) {
+    return {
+      model: dbMatch.canonicalName,
+      gen: dbMatch.isRebadge
+        ? `${dbMatch.realArchitecture} [Lancio Reale: ${dbMatch.releaseYear} — Rebrand ${dbMatch.rebadgeYear || ""}]`
+        : `${dbMatch.realArchitecture} (${dbMatch.releaseYear})`,
+      win11: dbMatch.win11Supported,
+      cores: dbMatch.cores,
+      threads: dbMatch.threads,
+      isRebadge: dbMatch.isRebadge,
+      rebadgeNotes: dbMatch.rebadgeNotes,
+      antiTrapWarning: dbMatch.antiTrapWarning,
+    };
+  }
 
   // Pattern Intel Core iX-XXXX
   const intelMatch = cpu.match(/i[3579][ -]?(\d{4,5})([A-Z]*)/i);
@@ -263,12 +287,29 @@ function analyzeCpu(rawCpu: string): {
 /**
  * Analizza le specifiche della GPU (dedicata vs integrata, VRAM)
  */
-function analyzeGpu(rawGpu: string): {
+function analyzeGpu(rawGpu: string, fullContextText: string = ""): {
   model: string;
   vram: number | null;
   type: "dedicated" | "integrated" | "unknown";
+  tier1080p?: "non_adatto" | "limitato" | "idoneo";
+  gamingVerdict?: string;
+  antiTrapWarning?: string | null;
 } {
   const gpu = rawGpu.trim();
+
+  // 1. Cerca nel database storico hardware locale
+  const dbMatch = lookupGpu(gpu) || lookupGpu(fullContextText);
+  if (dbMatch) {
+    return {
+      model: dbMatch.canonicalName,
+      vram: dbMatch.standardVramGb || null,
+      type: dbMatch.type,
+      tier1080p: dbMatch.tier1080p,
+      gamingVerdict: dbMatch.gamingVerdict,
+      antiTrapWarning: dbMatch.antiTrapWarning,
+    };
+  }
+
   const lower = gpu.toLowerCase();
 
   // Rilevamento Integrate
@@ -327,14 +368,20 @@ export function parseAmazonListing(
     }
   }
 
-  // 2. Estrazione Brand
+  // 2. Estrazione Brand (priorità ai marchi noti nel titolo)
   let brand = "Sconosciuto";
-  const brandMatch = htmlOrText.match(/bylineInfo"[^>]*>Visita lo store di ([^<]+)<\/a>/i) ||
-    htmlOrText.match(/Marchio\s*<\/th>\s*<td[^>]*>([^<]+)<\/td>/i) ||
-    htmlOrText.match(/Marchio[:\s]+([^\n\r,]+)/i);
-
-  if (brandMatch) {
-    brand = cleanText(brandMatch[1]);
+  if (/^hp\s|[\s-]hp\s/i.test(title) || title.startsWith("HP ")) {
+    brand = "HP";
+  } else if (/lenovo/i.test(title)) {
+    brand = "Lenovo";
+  } else if (/asus/i.test(title)) {
+    brand = "ASUS";
+  } else if (/acer/i.test(title)) {
+    brand = "Acer";
+  } else if (/dell/i.test(title)) {
+    brand = "Dell";
+  } else if (/msi/i.test(title)) {
+    brand = "MSI";
   } else if (/megaport/i.test(title)) {
     brand = "Megaport";
   } else if (/ankermann/i.test(title)) {
@@ -343,12 +390,13 @@ export function parseAmazonListing(
     brand = "Sedatech";
   } else if (/vibox/i.test(title)) {
     brand = "Vibox";
-  } else if (/hp /i.test(title)) {
-    brand = "HP";
-  } else if (/lenovo/i.test(title)) {
-    brand = "Lenovo";
-  } else if (/asus/i.test(title)) {
-    brand = "ASUS";
+  } else {
+    const brandMatch = htmlOrText.match(/Marchio\s*<\/th>\s*<td[^>]*>([^<]+)<\/td>/i) ||
+      htmlOrText.match(/Marchio[:\s]+([^\n\r,]+)/i) ||
+      htmlOrText.match(/bylineInfo"[^>]*>Visita lo store di ([^<]+)<\/a>/i);
+    if (brandMatch) {
+      brand = cleanText(brandMatch[1]);
+    }
   }
 
   // 3. Estrazione CPU
@@ -367,7 +415,7 @@ export function parseAmazonListing(
     }
   }
 
-  const cpuData = analyzeCpu(rawCpu || "Intel Core i7-4770");
+  const cpuData = analyzeCpu(rawCpu || title, htmlOrText);
 
   // 4. Estrazione GPU
   let rawGpu = "";
@@ -379,13 +427,14 @@ export function parseAmazonListing(
   } else {
     const gpuTitleMatch = title.match(/(?:GeForce\s+)?(?:GTX|RTX)\s+\d{3,4}(?:\s*Ti|\s*Super)?(?:\s*\dGB)?/i) ||
       title.match(/Radeon\s+RX\s+\d{4}(?:\s*XT)?/i) ||
+      title.match(/Radeon\s+\d{3}M/i) ||
       title.match(/Vega\s+\d/i);
     if (gpuTitleMatch) {
       rawGpu = gpuTitleMatch[0];
     }
   }
 
-  const gpuData = analyzeGpu(rawGpu || "GTX 1650 4GB");
+  const gpuData = analyzeGpu(rawGpu || title, htmlOrText);
 
   // 5. Estrazione RAM
   let ramGb = 16;
@@ -473,18 +522,25 @@ export function parseAmazonListing(
       weaknesses.push("Memoria RAM DDR3 obsoleta su socket non più aggiornabile senza sostituire blocco scheda madre/CPU/RAM.");
     }
   } else {
-    strengths.push(`Piattaforma moderna (${cpuData.gen}) pienamente compatibile con Windows 11 nativo.`);
+    strengths.push(`Piattaforma con ${cpuData.gen} compatibile con Windows 11 nativo.`);
   }
 
-  if (gpuData.type === "dedicated" && gpuData.vram && gpuData.vram <= 4) {
-    weaknesses.push(`Scheda video con soli ${gpuData.vram}GB di VRAM: soggetta a saturazione della memoria e freeze nei giochi moderni anche a 1080p.`);
+  // Avvisi specifici anti-trappola o rebrand da catalogo hardware storico
+  if (cpuData.antiTrapWarning) {
+    weaknesses.push(cpuData.antiTrapWarning);
+  }
+  if (gpuData.antiTrapWarning) {
+    weaknesses.push(gpuData.antiTrapWarning);
   }
 
-  if (gpuData.type === "dedicated" && gpuData.vram && gpuData.vram >= 8) {
+  if (gpuData.tier1080p) {
+    ratingGaming = gpuData.tier1080p;
+  } else if (gpuData.type === "dedicated" && gpuData.vram && gpuData.vram >= 8) {
     strengths.push(`GPU con ${gpuData.vram}GB di VRAM dedicata, adeguata per giocare a 1080p a dettagli alti.`);
     ratingGaming = "idoneo";
   } else if (gpuData.type === "dedicated" && gpuData.vram && gpuData.vram >= 4) {
     ratingGaming = "limitato";
+    weaknesses.push(`Scheda video con soli ${gpuData.vram}GB di VRAM: soggetta a saturazione della memoria e freeze nei giochi moderni anche a 1080p.`);
   } else {
     ratingGaming = "non_adatto";
     weaknesses.push("Grafica integrata o assenza di GPU dedicata: non idoneo per il gaming moderno 3D.");
@@ -553,7 +609,14 @@ export function parseAmazonListing(
       brand: brand || "Brand Generico",
       modelName: title.slice(0, 80),
       exactConfig: `${cpuData.model} / ${gpuData.model} / ${ramGb}GB ${ramType} / ${storageCapacityGb}GB ${storageType}`,
-      category: gpuData.type === "dedicated" ? "desktop_gaming" : "desktop_office",
+      category:
+        /notebook|laptop|portatile|display\s*1[34567]/i.test(htmlOrText) || /notebook|laptop|portatile/i.test(title)
+          ? "laptop"
+          : /mini\s*pc/i.test(htmlOrText) || /mini\s*pc/i.test(title)
+          ? "mini_pc"
+          : gpuData.type === "dedicated"
+          ? "desktop_gaming"
+          : "desktop_office",
       cpuModel: cpuData.model,
       cpuGen: cpuData.gen,
       cpuCoresThreads: null,

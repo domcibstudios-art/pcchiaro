@@ -168,6 +168,33 @@ describe("Test Modulo Estrazione & Importazione Amazon (PC, Recensione, Fonti, O
     assert.ok(pkg.sources.some((s) => s.sourceType === "produttore"));
   });
 
+  test("Estrazione e rilevamento rebrand: HP OmniBook con AMD Ryzen 5 130 e Radeon 660M", () => {
+    const omniBookTitle = `HP OmniBook 3 16-by0001slx, Notebook, AMD Ryzen 5 130, 8 GB RAM, 512 GB, AMD Radeon 660M integrata, Display 16" 2K IPS Antiriflesso 300 nits, Laptop, Windows 11, Portatile, Argento`;
+    const mockHtml = `<span id="productTitle">${omniBookTitle}</span><span class="a-price-whole">599</span>`;
+
+    const pkg = parseAmazonListing(mockHtml, "https://www.amazon.it/HP-16-by0001slx-integrata-Antiriflesso-Portatile/dp/B0GQZDM5WK");
+
+    assert.equal(pkg.pc.brand, "HP");
+    assert.equal(pkg.pc.category, "laptop");
+    assert.equal(pkg.pc.cpuModel, "AMD Ryzen 5 130");
+    assert.ok(pkg.pc.cpuGen?.includes("Zen 3+ (Rembrandt)"));
+    assert.ok(pkg.pc.cpuGen?.includes("2022"));
+    assert.equal(pkg.pc.gpuModel, "AMD Radeon 660M");
+    assert.equal(pkg.pc.gpuType, "integrated");
+    assert.equal(pkg.pc.ramGb, 8);
+    assert.equal(pkg.pc.storageCapacityGb, 512);
+
+    // Deve rilevare che la Radeon 660M integrata è limitata per il gaming 1080p
+    assert.equal(pkg.review.ratingGaming, "limitato");
+    assert.equal(pkg.review.ratingOffice, "idoneo");
+
+    // Deve contenere l'avviso di silicio riciclato tra le criticità
+    assert.ok(
+      pkg.review.weaknesses.some((w) => w.toLowerCase().includes("tre cifre") || w.toLowerCase().includes("2022")),
+      "La recensione deve evidenziare che il Ryzen 5 130 è silicio riciclato del 2022"
+    );
+  });
+
   test("Salvataggio transazionale completo del pacchetto nel database (PCS, REVIEWS, SOURCES, PRICE_OFFERS)", () => {
     const now = Date.now();
     const pkg: ExtractedHardwarePackage = {
