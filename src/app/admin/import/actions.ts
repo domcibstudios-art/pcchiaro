@@ -7,6 +7,7 @@ import { requireAdmin } from "@/lib/session";
 import { revalidatePath } from "next/cache";
 import { parseAmazonListing, extractAsinFromUrl, ExtractedHardwarePackage } from "@/lib/amazon-extractor";
 import { parseCsvText } from "@/lib/csv-parser";
+import { generateSeoMeta } from "@/lib/seo-engine";
 
 export interface ParseResult {
   success: boolean;
@@ -152,6 +153,8 @@ export async function saveImportedPackageAction(pkg: ExtractedHardwarePackage): 
           pcId: pcId,
           slug: pkg.review.slug,
           title: pkg.review.title,
+          metaTitle: pkg.review.metaTitle || null,
+          metaDescription: pkg.review.metaDescription || null,
           verdict: pkg.review.verdict,
           summaryIntro: pkg.review.summaryIntro,
           whyPositiveReviews: pkg.review.whyPositiveReviews || null,
@@ -307,6 +310,36 @@ export async function importCsvContentAction(csvText: string): Promise<{
           ? criticita.split("|").map((s) => s.trim()).filter(Boolean)
           : [];
 
+        // Genera automaticamente i Meta SEO ad alto CTR se non forniti
+        const { title: autoMetaTitle, description: autoMetaDesc } = generateSeoMeta(
+          {
+            title: titoloRecensione || modello,
+            summaryIntro: sommarioIntro || `Bozza importata da CSV per ${brand} ${modello}.`,
+            verdict: (verdetto as any) || "accettabile_base",
+            ratingGaming: (semaforoGaming as any) || "limitato",
+            notesGaming: noteGaming || "",
+            ratingWork: (semaforoLavoro as any) || "limitato",
+            notesWork: noteLavoro || "",
+            ratingOffice: (semaforoUfficio as any) || "idoneo",
+            notesOffice: noteUfficio || "",
+          },
+          {
+            brand: brand || "Brand Generico",
+            modelName: modello,
+            cpuModel: cpuModello,
+            cpuGen: cpuGen || null,
+            cpuWin11Support: cpuWin11 === "0" ? 0 : 1,
+            gpuModel: gpuModello || "Integrata",
+            gpuType: (gpuTipo as any) || "integrated",
+            ramGb: parseInt(ramGb, 10) || 16,
+            ramType: ramTipo || "DDR4",
+            ramChannel: (ramCanale as any) || "dual",
+            storageCapacityGb: parseInt(storageGb, 10) || 512,
+            storageType: storageTipo || "NVMe",
+            osOfficialSupport: cpuWin11 === "0" ? 0 : 1,
+          }
+        );
+
         tx.insert(pcs)
           .values({
             id: pcId,
@@ -339,6 +372,8 @@ export async function importCsvContentAction(csvText: string): Promise<{
             pcId: pcId,
             slug,
             title: titoloRecensione || modello,
+            metaTitle: autoMetaTitle,
+            metaDescription: autoMetaDesc,
             summaryIntro: sommarioIntro || `Bozza importata da CSV per ${brand} ${modello}.`,
             verdict: (verdetto as any) || "accettabile_base",
             evidenceLevel: "specifiche_dichiarate",

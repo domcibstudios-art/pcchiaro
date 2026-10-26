@@ -5,6 +5,7 @@
  */
 
 import { lookupCpu, lookupGpu } from "./hardware-lookup";
+import { generateSeoMeta } from "./seo-engine";
 
 export interface ExtractedHardwarePackage {
   extractedAt: number;
@@ -43,6 +44,8 @@ export interface ExtractedHardwarePackage {
   review: {
     slug: string;
     title: string;
+    metaTitle?: string;
+    metaDescription?: string;
     summaryIntro: string;
     whyPositiveReviews?: string | null;
     strengths: string[];
@@ -601,6 +604,33 @@ export function parseAmazonListing(
     });
   }
 
+  // Calcolo Meta SEO ad alto CTR
+  const { title: autoMetaTitle, description: autoMetaDesc } = generateSeoMeta(
+    {
+      title: title.slice(0, 100),
+      summaryIntro: `Analisi indipendente della configurazione ${brand} con ${cpuData.model} e ${gpuData.model}: verifica di compatibilità, banda memoria e limiti d'uso reali.`,
+      verdict,
+      ratingGaming,
+      ratingWork,
+      ratingOffice,
+    },
+    {
+      brand: brand || "Brand Generico",
+      modelName: title.slice(0, 80),
+      cpuModel: cpuData.model,
+      cpuGen: cpuData.gen,
+      cpuWin11Support: cpuData.win11,
+      gpuModel: gpuData.model,
+      gpuType: gpuData.type,
+      ramGb,
+      ramType,
+      ramChannel,
+      storageCapacityGb,
+      storageType,
+      osOfficialSupport: cpuData.win11,
+    }
+  );
+
   return {
     extractedAt: Date.now(),
     sourceUrl: sourceUrl || (asin ? `https://www.amazon.it/dp/${asin}` : undefined),
@@ -643,6 +673,8 @@ export function parseAmazonListing(
     review: {
       slug,
       title: title.slice(0, 100),
+      metaTitle: autoMetaTitle,
+      metaDescription: autoMetaDesc,
       summaryIntro: `Analisi indipendente della configurazione ${brand} con ${cpuData.model} e ${gpuData.model}: verifica di compatibilità, banda memoria e limiti d'uso reali.`,
       whyPositiveReviews:
         "Molti acquirenti lasciano una recensione entusiasta nelle prime 24 ore perché il PC si avvia rapidamente grazie all'SSD e presenta un case accattivante con ventole RGB, senza avere gli strumenti tecnici per verificare che la CPU è datata o che la RAM lavora a banda dimezzata.",

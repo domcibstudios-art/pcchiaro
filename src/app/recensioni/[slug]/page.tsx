@@ -6,6 +6,7 @@ import { pcs, reviews, curatedAlternatives, priceOffers, sources } from "@/db/sc
 import { eq, and, asc } from "drizzle-orm";
 import { SITE_CONFIG } from "@/config/site";
 import { getShowExactPrices } from "@/lib/settings";
+import { generateSeoMeta, generateReviewFaqs, generateStructuredData } from "@/lib/seo-engine";
 import SiteHeader from "@/components/public/site-header";
 import SiteFooter from "@/components/public/site-footer";
 import BottomNav from "@/components/public/bottom-nav";
@@ -40,8 +41,17 @@ export async function generateMetadata({ params }: ReviewPageProps): Promise<Met
   }
 
   const { review, pc } = item;
-  const pageTitle = `${review.title} - Analisi & Alternative | PCChiaro.it`;
-  const pageDesc = review.summaryIntro;
+  const activeOffer = db
+    .select()
+    .from(priceOffers)
+    .where(and(eq(priceOffers.pcId, pc.id), eq(priceOffers.isValid, 1)))
+    .get();
+
+  const { title: pageTitle, description: pageDesc } = generateSeoMeta(
+    review,
+    pc,
+    activeOffer ? { asin: activeOffer.asin, priceAmountEur: activeOffer.priceAmountEur } : undefined
+  );
 
   return {
     title: pageTitle,
@@ -153,8 +163,36 @@ export default async function ReviewDetailPage({ params }: ReviewPageProps) {
 
   const affiliateUrl = activeOffer?.affiliateUrl || "#";
 
+  // Generazione automatica FAQ e Dati Strutturati Schema.org
+  const faqs = generateReviewFaqs(review, pc);
+  const { reviewSchema, faqSchema } = generateStructuredData(
+    review,
+    pc,
+    activeOffer
+      ? {
+          asin: activeOffer.asin,
+          priceAmountEur: activeOffer.priceAmountEur,
+          affiliateUrl: activeOffer.affiliateUrl,
+        }
+      : undefined,
+    faqs,
+    `/recensioni/${slug}`
+  );
+
   return (
     <div className="min-h-screen flex flex-col pb-20 md:pb-0">
+      {/* SCHEMA.ORG STRUCTURED DATA (JSON-LD) PER GOOGLE */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(reviewSchema) }}
+      />
+      {faqSchema && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
+        />
+      )}
+
       <SiteHeader />
 
       <main className="flex-1 max-w-4xl mx-auto px-4 py-8 space-y-8 w-full">
@@ -559,6 +597,43 @@ export default async function ReviewDetailPage({ params }: ReviewPageProps) {
               })}
             </div>
           )}
+        </section>
+
+        {/* DOMANDE FREQUENTI SULL'HARDWARE (FAQ OTTIMIZZATE SEO GOOGLE) */}
+        <section aria-labelledby="faq-heading" className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+          <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
+            <span className="material-symbols-outlined text-brand text-2xl" aria-hidden="true">
+              help
+            </span>
+            <div>
+              <h2 id="faq-heading" className="font-headline font-bold text-xl text-slate-900">
+                Domande Frequenti su {pc.brand} {pc.modelName} (FAQ)
+              </h2>
+              <p className="text-xs text-slate-500">
+                Risposte tecniche oggettive basate sulla configurazione hardware reale
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-3 pt-1">
+            {faqs.map((faq, idx) => (
+              <details
+                key={idx}
+                className="group border border-slate-200 rounded-xl bg-slate-50/50 p-4 open:bg-white transition-colors"
+                open={idx === 0}
+              >
+                <summary className="font-semibold text-sm text-slate-900 cursor-pointer list-none flex items-center justify-between gap-3">
+                  <span>{faq.question}</span>
+                  <span className="material-symbols-outlined text-slate-400 group-open:rotate-180 transition-transform text-lg shrink-0">
+                    expand_more
+                  </span>
+                </summary>
+                <p className="text-xs sm:text-sm text-slate-600 mt-2.5 leading-relaxed pt-2 border-t border-slate-100">
+                  {faq.answer}
+                </p>
+              </details>
+            ))}
+          </div>
         </section>
 
         {/* FONTI CONSULTATE & METODOLOGIA */}
