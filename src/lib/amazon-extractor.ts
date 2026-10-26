@@ -556,12 +556,28 @@ export function parseAmazonListing(
     ratingWork = "limitato";
   }
 
+  // Valutazione quantitativo RAM (standard moderno: 16 GB minimo consigliato)
+  if (ramGb < 8) {
+    weaknesses.push(`Dotazione critica di soli ${ramGb}GB di RAM: insufficiente per Windows 11 moderno, causa immediata saturazione della memoria e continui blocchi del sistema.`);
+    verdict = "sconsigliato";
+    ratingOffice = "limitato";
+    ratingWork = "non_adatto";
+    ratingGaming = "non_adatto";
+  } else if (ramGb === 8) {
+    weaknesses.push("Dotazione di soli 8GB di RAM: oggi il minimo consigliato per Windows 11 e multitasking fluido è 16GB. Con poche schede aperte o applicazioni in background (e grafica integrata che condivide la memoria) il sistema va rapidamente in swap su disco.");
+    if (ratingWork === "idoneo") {
+      ratingWork = "limitato";
+    }
+  } else if (ramGb >= 16) {
+    strengths.push(`Dotazione di ${ramGb}GB di RAM: allineata agli standard moderni (minimo 16GB) per garantire longevità e multitasking fluido.`);
+  }
+
   if (ramChannel === "single") {
     weaknesses.push("RAM configurata in singolo canale: banda passante dimezzata con perdita fino al 20-25% di frame rate.");
   }
 
   if (verdict !== "sconsigliato") {
-    if (ratingGaming === "idoneo" && cpuData.win11 === 1) {
+    if (ratingGaming === "idoneo" && cpuData.win11 === 1 && ramGb >= 16) {
       verdict = "buon_acquisto";
     } else if (ratingOffice === "idoneo") {
       verdict = "accettabile_base";

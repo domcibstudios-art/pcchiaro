@@ -193,6 +193,13 @@ describe("Test Modulo Estrazione & Importazione Amazon (PC, Recensione, Fonti, O
       pkg.review.weaknesses.some((w) => w.toLowerCase().includes("tre cifre") || w.toLowerCase().includes("2022")),
       "La recensione deve evidenziare che il Ryzen 5 130 è silicio riciclato del 2022"
     );
+
+    // Deve rilevare che 8GB di RAM sono una limitazione moderna e bloccare 'buon_acquisto'
+    assert.ok(
+      pkg.review.weaknesses.some((w) => w.toLowerCase().includes("8gb")),
+      "La recensione deve segnalare la dotazione limitata di 8GB di RAM"
+    );
+    assert.notEqual(pkg.review.verdict, "buon_acquisto", "Un PC con soli 8GB non può ricevere 'buon_acquisto'");
   });
 
   test("Salvataggio transazionale completo del pacchetto nel database (PCS, REVIEWS, SOURCES, PRICE_OFFERS)", () => {

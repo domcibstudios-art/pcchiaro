@@ -63,9 +63,10 @@ test("Modulo Automazione SEO", async (t) => {
     assert.ok(faqs[1].question.includes("AMD Ryzen 5 130"));
     assert.ok(faqs[1].answer.includes("Zen 3+"));
 
-    // FAQ 3: RAM Single Channel alert
+    // FAQ 3: RAM Single Channel alert e limite 8GB
     assert.ok(faqs[2].question.includes("RAM"));
     assert.ok(faqs[2].answer.includes("Single Channel"));
+    assert.ok(faqs[2].answer.includes("16 GB"), "La risposta RAM deve citare lo standard minimo moderno di 16 GB");
 
     // FAQ 4: Verdetto
     assert.ok(faqs[3].question.includes("giudizio finale"));

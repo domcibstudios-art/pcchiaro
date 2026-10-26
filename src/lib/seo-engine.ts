@@ -131,11 +131,20 @@ export function generateReviewFaqs(review: ReviewMetaInput, pc: PcMetaInput): Fa
   });
 
   // FAQ 3: Memoria RAM e Canale
-  let ramAnswer = `Il computer è equipaggiato con ${pc.ramGb || 16} GB di memoria RAM ${pc.ramType || ""}. `;
+  const ramAmount = pc.ramGb || 16;
+  let ramAnswer = `Il computer è equipaggiato con ${ramAmount} GB di memoria RAM ${pc.ramType || ""}. `;
+  if (ramAmount < 8) {
+    ramAnswer += `❌ Criticità grave: meno di 8 GB di memoria sono inadeguati per Windows 11 moderno e causano saturazione immediata anche con attività basilari. `;
+  } else if (ramAmount === 8) {
+    ramAnswer += `⚠️ Attenzione: 8 GB rappresentano oggi un limite stringente. Per Windows 11, navigazione web con più schede e multitasking senza rallentamenti, lo standard minimo consigliato dalla nostra redazione è di 16 GB. `;
+  } else {
+    ramAnswer += `✅ La dotazione soddisfa lo standard minimo moderno di 16 GB consigliato per garantire fluidità e longevità con Windows 11. `;
+  }
+
   if (pc.ramChannel === "single") {
-    ramAnswer += `⚠️ Nota tecnica: la memoria opera in singolo canale (Single Channel), il che dimezza la banda passante teorica rispetto al Dual Channel, provocando cali di prestazioni nei carichi intensivi e nei giochi.`;
+    ramAnswer += `Inoltre, la memoria opera in singolo canale (Single Channel), dimezzando la banda passante teorica rispetto al Dual Channel.`;
   } else if (pc.ramChannel === "dual") {
-    ramAnswer += `La memoria è configurata in Dual Channel (due banchi attivi), garantendo la massima banda passante del processore.`;
+    ramAnswer += `La memoria è configurata in Dual Channel (due banchi attivi), garantendo la massima velocità di trasferimento.`;
   } else {
     ramAnswer += `Si consiglia di verificare che siano presenti due banchi distinti per sfruttare la tecnologia Dual Channel.`;
   }
