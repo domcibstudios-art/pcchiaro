@@ -1,0 +1,37 @@
+{
+  "amazon": {
+    "domain": "https://www.amazon.it",
+    "affiliate_tag": "pcchiaro-21",
+    "categories": {
+      "notebook_bestsellers": "https://www.amazon.it/gp/bestsellers/pc/460158031",
+      "notebook_new_releases": "https://www.amazon.it/gp/new-releases/pc/460158031",
+      "notebook_movers": "https://www.amazon.it/gp/movers-and-shakers/pc/460158031",
+      "desktop_bestsellers": "https://www.amazon.it/gp/bestsellers/pc/460159031",
+      "minipc_search": "https://www.amazon.it/s?k=mini+pc+windows+11&s=exact-aware-popularity-rank"
+    },
+    "request_delay_seconds": [3, 5],
+    "user_agents": [
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0",
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    ]
+  },
+  "filtri_trappole": {
+    "soglia_prezzo_8gb_ram_eur": 420.0,
+    "cpu_obsolete_o_deboli": [
+      "celeron", "n4020", "n4500", "n4100", "n4000", "n5100", "n5030", "pentium",
+      "athlon", "i7-2", "i7-3", "i7-4", "i7-6", "i7-7", "i5-2", "i5-3", "i5-4", "i5-6", "i5-7",
+      "a6-", "a9-", "a10-", "e2-", "fx-"
+    ],
+    "cpu_rebrand_zen2": ["7520u", "7320u", "7220u"],
+    "cpu_rebrand_zen3plus": ["ryzen 5 130", "ryzen 7 150", "7535hs", "7735hs"],
+    "gpu_obsolete_spacciate_gaming": [
+      "gt 710", "gt 730", "gt 1030", "gtx 750", "gtx 950", "gtx 960", "gtx 1050", "rx 550"
+    ]
+  },
+  "ai": {
+    "provider": "heuristic",
+    "model": "gpt-4o",
+    "api_key": ""
+  }
+}

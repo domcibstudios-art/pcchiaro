@@ -1,0 +1,29 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "pcchiaro",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2024-12-30",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "assets": {
+    "binding": "ASSETS",
+    "directory": ".open-next/assets"
+  },
+  "cache": {
+    "enabled": true
+  },
+  "vars": {
+    "NODE_ENV": "production",
+    "ADMIN_USERNAME": "admin",
+    "NEXT_PUBLIC_SITE_URL": "https://pcchiaro.domcibstudios.workers.dev"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "pcchiaro-db",
+      "database_id": "b4054e51-a108-48cc-baef-8ea9e58cde61",
+      "migrations_dir": "src/db/migrations"
+    }
+  ]
+}

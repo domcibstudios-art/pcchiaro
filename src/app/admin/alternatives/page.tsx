@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { db } from "@/db";
+import { getDb } from "@/db";
 import { curatedAlternatives, reviews, pcs } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { toggleApprovalAction, verifyAlternativeAction, deleteAlternativeAction } from "./actions";
@@ -16,7 +16,8 @@ export default async function AdminAlternativesPage({
   const now = Date.now();
   const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
 
-  const allAlternatives = db
+  const database = await getDb();
+  const allAlternatives = await database
     .select({
       alt: curatedAlternatives,
       review: reviews,
@@ -24,8 +25,7 @@ export default async function AdminAlternativesPage({
     })
     .from(curatedAlternatives)
     .innerJoin(reviews, eq(curatedAlternatives.sourceReviewId, reviews.id))
-    .innerJoin(pcs, eq(curatedAlternatives.targetPcId, pcs.id))
-    .all();
+    .innerJoin(pcs, eq(curatedAlternatives.targetPcId, pcs.id));
 
   const filtered = allAlternatives.filter(({ alt }) => {
     if (params.reviewId && alt.sourceReviewId !== params.reviewId) return false;

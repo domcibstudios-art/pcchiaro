@@ -1,4 +1,4 @@
-import { db } from "@/db";
+import { getDb } from "@/db";
 import { reviews, pcs } from "@/db/schema";
 import AlternativeForm from "../alternative-form";
 
@@ -10,25 +10,24 @@ export default async function NewAlternativePage({
   searchParams: Promise<{ reviewId?: string }>;
 }) {
   const params = await searchParams;
+  const database = await getDb();
 
-  const availableReviews = db
+  const availableReviews = await database
     .select({
       id: reviews.id,
       title: reviews.title,
       pcId: reviews.pcId,
     })
-    .from(reviews)
-    .all();
+    .from(reviews);
 
-  const availablePcs = db
+  const availablePcs = await database
     .select({
       id: pcs.id,
       brand: pcs.brand,
       modelName: pcs.modelName,
       editorialStatus: pcs.editorialStatus,
     })
-    .from(pcs)
-    .all();
+    .from(pcs);
 
   return (
     <div className="space-y-6">

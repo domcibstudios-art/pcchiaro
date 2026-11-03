@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { db } from "@/db";
+import { getDb } from "@/db";
 import { reviews, pcs, curatedAlternatives, sources, priceOffers } from "@/db/schema";
 import { eq, asc } from "drizzle-orm";
 import { publishReviewAction, unpublishReviewAction } from "../../actions";
@@ -16,16 +16,19 @@ export default async function ReviewPreviewPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const showExactPrices = getShowExactPrices();
-  const review = db.select().from(reviews).where(eq(reviews.id, id)).get();
+  const database = await getDb();
+  const showExactPrices = await getShowExactPrices();
+  const reviewRows = await database.select().from(reviews).where(eq(reviews.id, id)).limit(1);
+  const review = reviewRows && reviewRows.length > 0 ? reviewRows[0] : null;
 
   if (!review) notFound();
 
-  const pc = db.select().from(pcs).where(eq(pcs.id, review.pcId)).get();
+  const pcRows = await database.select().from(pcs).where(eq(pcs.id, review.pcId)).limit(1);
+  const pc = pcRows && pcRows.length > 0 ? pcRows[0] : null;
   if (!pc) notFound();
 
   // 1. Alternative curate collegate
-  const alternatives = db
+  const alternatives = await database
     .select({
       alt: curatedAlternatives,
       targetPc: pcs,
@@ -33,22 +36,19 @@ export default async function ReviewPreviewPage({
     .from(curatedAlternatives)
     .innerJoin(pcs, eq(curatedAlternatives.targetPcId, pcs.id))
     .where(eq(curatedAlternatives.sourceReviewId, id))
-    .orderBy(asc(curatedAlternatives.displayOrder))
-    .all();
+    .orderBy(asc(curatedAlternatives.displayOrder));
 
   // 2. Fonti consultate
-  const reviewSources = db
+  const reviewSources = await database
     .select()
     .from(sources)
-    .where(eq(sources.reviewId, id))
-    .all();
+    .where(eq(sources.reviewId, id));
 
   // 3. Offerte commerciali registrate per questo PC
-  const offers = db
+  const offers = await database
     .select()
     .from(priceOffers)
-    .where(eq(priceOffers.pcId, pc.id))
-    .all();
+    .where(eq(priceOffers.pcId, pc.id));
 
   const now = Date.now();
   const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;

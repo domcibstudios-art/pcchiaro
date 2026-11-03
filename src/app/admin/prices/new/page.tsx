@@ -1,4 +1,4 @@
-import { db } from "@/db";
+import { getDb } from "@/db";
 import { pcs } from "@/db/schema";
 import PriceForm from "../price-form";
 
@@ -10,15 +10,15 @@ export default async function NewPriceOfferPage({
   searchParams: Promise<{ pcId?: string }>;
 }) {
   const params = await searchParams;
+  const database = await getDb();
 
-  const availablePcs = db
+  const availablePcs = await database
     .select({
       id: pcs.id,
       brand: pcs.brand,
       modelName: pcs.modelName,
     })
-    .from(pcs)
-    .all();
+    .from(pcs);
 
   return (
     <div className="space-y-6">

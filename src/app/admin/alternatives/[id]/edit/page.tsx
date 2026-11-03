@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { db } from "@/db";
+import { getDb } from "@/db";
 import { curatedAlternatives, reviews, pcs } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import AlternativeForm from "../../alternative-form";
@@ -12,28 +12,28 @@ export default async function EditAlternativePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const alt = db.select().from(curatedAlternatives).where(eq(curatedAlternatives.id, id)).get();
+  const database = await getDb();
+  const rows = await database.select().from(curatedAlternatives).where(eq(curatedAlternatives.id, id)).limit(1);
+  const alt = rows && rows.length > 0 ? rows[0] : null;
 
   if (!alt) notFound();
 
-  const availableReviews = db
+  const availableReviews = await database
     .select({
       id: reviews.id,
       title: reviews.title,
       pcId: reviews.pcId,
     })
-    .from(reviews)
-    .all();
+    .from(reviews);
 
-  const availablePcs = db
+  const availablePcs = await database
     .select({
       id: pcs.id,
       brand: pcs.brand,
       modelName: pcs.modelName,
       editorialStatus: pcs.editorialStatus,
     })
-    .from(pcs)
-    .all();
+    .from(pcs);
 
   return (
     <div className="space-y-6">

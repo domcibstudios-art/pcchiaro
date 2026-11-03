@@ -2,11 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { db } from "@/db";
+import { getDb } from "@/db";
 import { pcs, reviews, curatedAlternatives } from "@/db/schema";
 import { eq, or } from "drizzle-orm";
 import { requireAdmin } from "@/lib/session";
 import { pcSchema } from "@/lib/validations";
+import { invalidatePublicCache } from "@/lib/cache-invalidation";
 import crypto from "crypto";
 
 export async function savePcAction(prevState: { error?: string } | undefined, formData: FormData) {
@@ -96,8 +97,10 @@ export async function savePcAction(prevState: { error?: string } | undefined, fo
   const now = Date.now();
 
   try {
+    const database = await getDb();
     if (isEditing) {
-      db.update(pcs)
+      await database
+        .update(pcs)
         .set({
           brand: validData.brand,
           modelName: validData.modelName,
@@ -132,10 +135,10 @@ export async function savePcAction(prevState: { error?: string } | undefined, fo
           editorialStatus: validData.editorialStatus,
           updatedAt: now,
         })
-        .where(eq(pcs.id, id))
-        .run();
+        .where(eq(pcs.id, id));
     } else {
-      db.insert(pcs)
+      await database
+        .insert(pcs)
         .values({
           id,
           brand: validData.brand,
@@ -171,49 +174,50 @@ export async function savePcAction(prevState: { error?: string } | undefined, fo
           editorialStatus: validData.editorialStatus,
           createdAt: now,
           updatedAt: now,
-        })
-        .run();
+        });
     }
   } catch (error: any) {
     return { error: `Errore durante il salvataggio: ${error.message}` };
   }
 
+  await invalidatePublicCache();
   revalidatePath("/admin/pcs");
   revalidatePath("/admin");
-  revalidatePath("/");
   redirect("/admin/pcs");
 }
 
 export async function archivePcAction(id: string) {
   await requireAdmin();
-  db.update(pcs)
+  const database = await getDb();
+  await database
+    .update(pcs)
     .set({ editorialStatus: "archived", updatedAt: Date.now() })
-    .where(eq(pcs.id, id))
-    .run();
+    .where(eq(pcs.id, id));
 
+  await invalidatePublicCache();
   revalidatePath("/admin/pcs");
   revalidatePath("/admin");
-  revalidatePath("/");
 }
 
 export async function deletePcAction(id: string) {
   await requireAdmin();
+  const database = await getDb();
 
   // Controlla se il PC è referenziato come alternativa da una recensione
-  const alternativeRef = db
+  const alternativeRefs = await database
     .select()
     .from(curatedAlternatives)
     .where(eq(curatedAlternatives.targetPcId, id))
-    .get();
+    .limit(1);
 
-  if (alternativeRef) {
+  if (alternativeRefs && alternativeRefs.length > 0) {
     throw new Error(
       "Impossibile eliminare questo PC: è attualmente referenziato come alternativa consigliata in una recensione. Archivia il prodotto o rimuovi l'alternativa prima di procedere."
     );
   }
 
-  db.delete(pcs).where(eq(pcs.id, id)).run();
+  await database.delete(pcs).where(eq(pcs.id, id));
+  await invalidatePublicCache();
   revalidatePath("/admin/pcs");
   revalidatePath("/admin");
-  revalidatePath("/");
 }

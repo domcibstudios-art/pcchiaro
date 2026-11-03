@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { db } from "@/db";
+import { getDb } from "@/db";
 import { priceOffers, pcs } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import PriceForm from "../../price-form";
@@ -12,18 +12,19 @@ export default async function EditPriceOfferPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const offer = db.select().from(priceOffers).where(eq(priceOffers.id, id)).get();
+  const database = await getDb();
+  const rows = await database.select().from(priceOffers).where(eq(priceOffers.id, id)).limit(1);
+  const offer = rows && rows.length > 0 ? rows[0] : null;
 
   if (!offer) notFound();
 
-  const availablePcs = db
+  const availablePcs = await database
     .select({
       id: pcs.id,
       brand: pcs.brand,
       modelName: pcs.modelName,
     })
-    .from(pcs)
-    .all();
+    .from(pcs);
 
   return (
     <div className="space-y-6">

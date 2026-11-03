@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { db } from "@/db";
+import { getDb } from "@/db";
 import { pcs } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import PcForm from "../../pc-form";
@@ -12,7 +12,9 @@ export default async function EditPcPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const pc = db.select().from(pcs).where(eq(pcs.id, id)).get();
+  const database = await getDb();
+  const rows = await database.select().from(pcs).where(eq(pcs.id, id)).limit(1);
+  const pc = rows && rows.length > 0 ? rows[0] : null;
 
   if (!pc) {
     notFound();

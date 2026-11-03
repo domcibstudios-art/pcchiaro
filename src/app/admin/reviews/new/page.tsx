@@ -1,4 +1,4 @@
-import { db } from "@/db";
+import { getDb } from "@/db";
 import { pcs } from "@/db/schema";
 import ReviewForm from "../review-form";
 
@@ -10,14 +10,14 @@ export default async function NewReviewPage({
   searchParams: Promise<{ pcId?: string }>;
 }) {
   const params = await searchParams;
-  const availablePcs = db
+  const database = await getDb();
+  const availablePcs = await database
     .select({
       id: pcs.id,
       modelName: pcs.modelName,
       brand: pcs.brand,
     })
-    .from(pcs)
-    .all();
+    .from(pcs);
 
   return (
     <div className="space-y-6">

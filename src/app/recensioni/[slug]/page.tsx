@@ -1,11 +1,11 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { db } from "@/db";
+import { getDb } from "@/db";
 import { pcs, reviews, curatedAlternatives, priceOffers, sources } from "@/db/schema";
 import { eq, and, asc } from "drizzle-orm";
 import { SITE_CONFIG } from "@/config/site";
-import { getShowExactPrices } from "@/lib/settings";
+import { getShowExactPrices, getAmazonAffiliateTagAsync } from "@/lib/settings";
 import { buildAffiliateUrl } from "@/lib/affiliate";
 import { generateSeoMeta, generateReviewFaqs, generateStructuredData } from "@/lib/seo-engine";
 import SiteHeader from "@/components/public/site-header";
@@ -21,11 +21,12 @@ interface ReviewPageProps {
   }>;
 }
 
-export const dynamic = "force-dynamic";
+export const revalidate = 3600; // Cache di 1 ora: le recensioni cambiano solo su modifica redazionale
 
 export async function generateMetadata({ params }: ReviewPageProps): Promise<Metadata> {
   const { slug } = await params;
-  const item = db
+  const db = await getDb();
+  const items = await db
     .select({
       review: reviews,
       pc: pcs,
@@ -33,20 +34,22 @@ export async function generateMetadata({ params }: ReviewPageProps): Promise<Met
     .from(reviews)
     .innerJoin(pcs, eq(reviews.pcId, pcs.id))
     .where(and(eq(reviews.slug, slug), eq(reviews.status, "published")))
-    .get();
+    .limit(1);
 
-  if (!item) {
+  if (!items || items.length === 0) {
     return {
       title: "Recensione non trovata - PCChiaro.it",
     };
   }
 
-  const { review, pc } = item;
-  const activeOffer = db
+  const { review, pc } = items[0];
+  const activeOffers = await db
     .select()
     .from(priceOffers)
     .where(and(eq(priceOffers.pcId, pc.id), eq(priceOffers.isValid, 1)))
-    .get();
+    .limit(1);
+
+  const activeOffer = activeOffers && activeOffers.length > 0 ? activeOffers[0] : null;
 
   const { title: pageTitle, description: pageDesc } = generateSeoMeta(
     review,
@@ -72,10 +75,14 @@ export async function generateMetadata({ params }: ReviewPageProps): Promise<Met
 
 export default async function ReviewDetailPage({ params }: ReviewPageProps) {
   const { slug } = await params;
-  const showExactPrices = getShowExactPrices();
+  const db = await getDb();
+  const [showExactPrices, affiliateTag] = await Promise.all([
+    getShowExactPrices(),
+    getAmazonAffiliateTagAsync(),
+  ]);
 
   // Query la recensione e i dettagli hardware del PC
-  const item = db
+  const items = await db
     .select({
       review: reviews,
       pc: pcs,
@@ -83,26 +90,27 @@ export default async function ReviewDetailPage({ params }: ReviewPageProps) {
     .from(reviews)
     .innerJoin(pcs, eq(reviews.pcId, pcs.id))
     .where(and(eq(reviews.slug, slug), eq(reviews.status, "published")))
-    .get();
+    .limit(1);
 
-  if (!item) {
+  if (!items || items.length === 0) {
     notFound();
   }
 
-  const { review, pc } = item;
+  const { review, pc } = items[0];
 
   // Offerte commerciali valide
-  const allValidOffers = db
+  const allValidOffers = await db
     .select()
     .from(priceOffers)
-    .where(eq(priceOffers.isValid, 1))
-    .all();
+    .where(eq(priceOffers.isValid, 1));
 
-  const offersByPcId = new Map(allValidOffers.map((o) => [o.pcId, o]));
+  const offersByPcId = new Map<string, typeof priceOffers.$inferSelect>(
+    allValidOffers.map((o: any) => [o.pcId, o])
+  );
   const activeOffer = offersByPcId.get(pc.id);
 
   // Alternative curate APPROVATE (isApproved = 1)
-  const approvedAlternatives = db
+  const approvedAlternatives = await db
     .select({
       alt: curatedAlternatives,
       targetPc: pcs,
@@ -115,28 +123,27 @@ export default async function ReviewDetailPage({ params }: ReviewPageProps) {
         eq(curatedAlternatives.isApproved, 1)
       )
     )
-    .orderBy(asc(curatedAlternatives.displayOrder))
-    .all();
+    .orderBy(asc(curatedAlternatives.displayOrder));
 
   // Per ciascuna alternativa, controlla se il targetPc ha a sua volta una recensione pubblicata
-  const targetPcReviews = db
+  const targetPcReviews = await db
     .select({
       pcId: reviews.pcId,
       slug: reviews.slug,
       verdict: reviews.verdict,
     })
     .from(reviews)
-    .where(eq(reviews.status, "published"))
-    .all();
+    .where(eq(reviews.status, "published"));
 
-  const reviewsByPcId = new Map(targetPcReviews.map((r) => [r.pcId, r]));
+  const reviewsByPcId = new Map<string, { pcId: string; slug: string; verdict: any }>(
+    targetPcReviews.map((r: any) => [r.pcId, r])
+  );
 
   // Fonti consultate registrate per questa recensione
-  const reviewSources = db
+  const reviewSources = await db
     .select()
     .from(sources)
-    .where(eq(sources.reviewId, review.id))
-    .all();
+    .where(eq(sources.reviewId, review.id));
 
   // Parsing JSON arrays di punti di forza, criticità e specifiche omesse
   let strengthsList: string[] = [];
@@ -163,7 +170,7 @@ export default async function ReviewDetailPage({ params }: ReviewPageProps) {
   }
 
   const affiliateUrl = activeOffer
-    ? buildAffiliateUrl(activeOffer.cleanUrl || activeOffer.affiliateUrl || activeOffer.asin)
+    ? buildAffiliateUrl(activeOffer.cleanUrl || activeOffer.affiliateUrl || activeOffer.asin, affiliateTag)
     : "#";
 
   // Generazione automatica FAQ e Dati Strutturati Schema.org
@@ -176,7 +183,8 @@ export default async function ReviewDetailPage({ params }: ReviewPageProps) {
           asin: activeOffer.asin,
           priceAmountEur: activeOffer.priceAmountEur,
           affiliateUrl: buildAffiliateUrl(
-            activeOffer.cleanUrl || activeOffer.affiliateUrl || activeOffer.asin
+            activeOffer.cleanUrl || activeOffer.affiliateUrl || activeOffer.asin,
+            affiliateTag
           ),
         }
       : undefined,
@@ -448,6 +456,26 @@ export default async function ReviewDetailPage({ params }: ReviewPageProps) {
               {SITE_CONFIG.pricing.stalePriceNotice}
             </p>
           </div>
+
+          {review.estimatedFairValueEur && (
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 font-medium">
+              <span className="material-symbols-outlined text-base text-emerald-600" aria-hidden="true">price_check</span>
+              <span>Soglia di convenienza stimata dalla redazione: <strong>entro ~{review.estimatedFairValueEur.toFixed(0)}€</strong></span>
+            </div>
+          )}
+
+          {activeOffer?.priceAmountEur && review.estimatedFairValueEur && activeOffer.priceAmountEur > review.estimatedFairValueEur * 1.25 && (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 max-w-lg mx-auto text-left flex items-start gap-2">
+              <span className="material-symbols-outlined text-base text-amber-700 shrink-0 mt-0.5" aria-hidden="true">warning</span>
+              <div>
+                <strong>Attenzione all&apos;oscillazione dei prezzi su Amazon:</strong>
+                <p className="mt-0.5 text-amber-800">
+                  Questa macchina rappresenta un acquisto valido solo se acquistata entro la soglia stimata (~{review.estimatedFairValueEur.toFixed(0)}€). 
+                  Se su Amazon il prezzo attuale risulta sensibilmente superiore (spesso a causa di commercianti terzi sul marketplace), il rapporto qualità/prezzo viene meno ed è preferibile orientarsi sulle alternative riportate in basso.
+                </p>
+              </div>
+            </div>
+          )}
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
             {affiliateUrl !== "#" ? (

@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { db } from "@/db";
+import { getDb } from "@/db";
 import { sources, reviews } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import SourceForm from "../../source-form";
@@ -12,17 +12,18 @@ export default async function EditSourcePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const source = db.select().from(sources).where(eq(sources.id, id)).get();
+  const database = await getDb();
+  const rows = await database.select().from(sources).where(eq(sources.id, id)).limit(1);
+  const source = rows && rows.length > 0 ? rows[0] : null;
 
   if (!source) notFound();
 
-  const availableReviews = db
+  const availableReviews = await database
     .select({
       id: reviews.id,
       title: reviews.title,
     })
-    .from(reviews)
-    .all();
+    .from(reviews);
 
   return (
     <div className="space-y-6">

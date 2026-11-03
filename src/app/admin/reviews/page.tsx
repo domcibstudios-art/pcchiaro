@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { db } from "@/db";
+import { getDb } from "@/db";
 import { reviews, pcs } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { publishReviewAction, unpublishReviewAction, deleteReviewAction } from "./actions";
@@ -17,14 +17,14 @@ export default async function AdminReviewsPage({
   const now = Date.now();
   const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
 
-  const reviewList = db
+  const database = await getDb();
+  const reviewList = await database
     .select({
       review: reviews,
       pc: pcs,
     })
     .from(reviews)
-    .innerJoin(pcs, eq(reviews.pcId, pcs.id))
-    .all();
+    .innerJoin(pcs, eq(reviews.pcId, pcs.id));
 
   const filtered = reviewList.filter(({ review }) => {
     if (params.filter === "stale") {

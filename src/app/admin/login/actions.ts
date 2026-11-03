@@ -14,11 +14,12 @@ export async function loginAction(prevState: { error?: string } | undefined, for
   const password = formData.get("password") as string;
 
   const headerList = await headers();
+  const cfIp = headerList.get("cf-connecting-ip");
   const forwardedFor = headerList.get("x-forwarded-for");
-  const ipAddress = forwardedFor ? forwardedFor.split(",")[0].trim() : "127.0.0.1";
+  const ipAddress = cfIp || (forwardedFor ? forwardedFor.split(",")[0].trim() : "127.0.0.1");
 
   // 1. Controllo anti brute-force
-  if (isIpRateLimited(ipAddress)) {
+  if (await isIpRateLimited(ipAddress)) {
     return {
       error: "Troppi tentativi falliti da questo indirizzo IP. Riprova tra 15 minuti.",
     };
@@ -36,7 +37,7 @@ export async function loginAction(prevState: { error?: string } | undefined, for
 
   // 2. Controllo username
   if (!username || username !== expectedUsername) {
-    recordLoginAttempt(ipAddress, false);
+    await recordLoginAttempt(ipAddress, false);
     return { error: "Credenziali non valide. Riprova." };
   }
 
@@ -44,12 +45,12 @@ export async function loginAction(prevState: { error?: string } | undefined, for
   const isPasswordValid = await verifyPassword(password || "", expectedHash);
 
   if (!isPasswordValid) {
-    recordLoginAttempt(ipAddress, false);
+    await recordLoginAttempt(ipAddress, false);
     return { error: "Credenziali non valide. Riprova." };
   }
 
   // Successo: registra tentativo e crea cookie protetto HttpOnly
-  recordLoginAttempt(ipAddress, true);
+  await recordLoginAttempt(ipAddress, true);
   await setAdminSession(username);
 
   redirect("/admin");

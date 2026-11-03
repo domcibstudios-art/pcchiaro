@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { db } from "@/db";
+import { getDb } from "@/db";
 import { priceOffers, pcs } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import {
@@ -9,7 +9,7 @@ import {
   toggleShowExactPricesAction,
 } from "./actions";
 import DeleteButton from "@/components/admin/delete-button";
-import { getShowExactPrices, getAmazonAffiliateTag } from "@/lib/settings";
+import { getShowExactPrices, getAmazonAffiliateTagAsync } from "@/lib/settings";
 import { buildAffiliateUrl } from "@/lib/affiliate";
 import AffiliateTagCard from "./affiliate-tag-card";
 
@@ -23,17 +23,17 @@ export default async function AdminPricesPage({
   const params = await searchParams;
   const now = Date.now();
   const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
-  const showExactPrices = getShowExactPrices();
-  const affiliateTag = getAmazonAffiliateTag();
+  const database = await getDb();
+  const showExactPrices = await getShowExactPrices();
+  const affiliateTag = await getAmazonAffiliateTagAsync();
 
-  const allOffers = db
+  const allOffers = await database
     .select({
       offer: priceOffers,
       pc: pcs,
     })
     .from(priceOffers)
-    .innerJoin(pcs, eq(priceOffers.pcId, pcs.id))
-    .all();
+    .innerJoin(pcs, eq(priceOffers.pcId, pcs.id));
 
   const filtered = allOffers.filter(({ offer }) => {
     if (params.pcId && offer.pcId !== params.pcId) return false;

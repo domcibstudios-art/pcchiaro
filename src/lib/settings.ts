@@ -1,55 +1,98 @@
-import { db } from "@/db";
+import { getDb } from "@/db";
 import { siteSettings } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { SITE_CONFIG } from "@/config/site";
-import { requireAdmin } from "./session";
-import { revalidatePath } from "next/cache";
 
 const SETTING_KEY_SHOW_EXACT_PRICES = "show_exact_prices";
 const SETTING_KEY_AMAZON_AFFILIATE_TAG = "amazon_affiliate_tag";
+
+let cachedAffiliateTag: string | null = null;
+let cachedShowExactPrices: boolean | null = null;
 
 /**
  * Legge lo stato di visualizzazione dei prezzi esatti.
  * Default: false (modalità conforme Amazon policy).
  */
-export function getShowExactPrices(): boolean {
+export async function getShowExactPrices(): Promise<boolean> {
   try {
-    const record = db
+    const database = await getDb();
+    const rows = await database
       .select()
       .from(siteSettings)
       .where(eq(siteSettings.key, SETTING_KEY_SHOW_EXACT_PRICES))
-      .get();
+      .limit(1);
 
-    if (!record) {
-      return SITE_CONFIG.pricing.defaultShowExactPrices;
+    if (rows && rows.length > 0) {
+      cachedShowExactPrices = rows[0].value === "true";
+      return cachedShowExactPrices;
     }
-
-    return record.value === "true";
-  } catch {
     return SITE_CONFIG.pricing.defaultShowExactPrices;
+  } catch {
+    return cachedShowExactPrices ?? SITE_CONFIG.pricing.defaultShowExactPrices;
   }
+}
+
+/**
+ * Versione sincrona per contesti che non supportano chiamate asincrone.
+ */
+export function getShowExactPricesSync(): boolean {
+  if (cachedShowExactPrices !== null) {
+    return cachedShowExactPrices;
+  }
+  return SITE_CONFIG.pricing.defaultShowExactPrices;
+}
+
+/**
+ * Recupera in modo asincrono il Tag Affiliazione Amazon dal database o dalle env.
+ */
+export async function getAmazonAffiliateTagAsync(): Promise<string> {
+  try {
+    const database = await getDb();
+    const rows = await database
+      .select()
+      .from(siteSettings)
+      .where(eq(siteSettings.key, SETTING_KEY_AMAZON_AFFILIATE_TAG))
+      .limit(1);
+
+    if (rows && rows.length > 0 && rows[0].value.trim()) {
+      cachedAffiliateTag = rows[0].value.trim();
+      return rows[0].value.trim();
+    }
+  } catch {
+    // Continua con il fallback
+  }
+
+  return getAmazonAffiliateTag();
 }
 
 /**
  * Recupera il Tag Affiliazione Amazon centralizzato del sito.
  * Ordine di priorità:
- * 1. Valore salvato dall'admin nel database (tabella site_settings)
+ * 1. Valore salvato in cache/DB
  * 2. Variabile d'ambiente NEXT_PUBLIC_AMAZON_AFFILIATE_TAG o AMAZON_AFFILIATE_TAG
  * 3. Stringa vuota (nessun tag applicato, link diretti puliti ad Amazon)
  */
 export function getAmazonAffiliateTag(): string {
+  if (cachedAffiliateTag !== null && cachedAffiliateTag.trim()) {
+    return cachedAffiliateTag.trim();
+  }
+
+  // Se siamo in ambiente Node (es. test unitari), prova a leggere in modo sincrono
   try {
-    const record = db
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { nodeDb } = require("@/db/node");
+    const record = nodeDb
       .select()
       .from(siteSettings)
       .where(eq(siteSettings.key, SETTING_KEY_AMAZON_AFFILIATE_TAG))
       .get();
 
     if (record && record.value.trim()) {
+      cachedAffiliateTag = record.value.trim();
       return record.value.trim();
     }
   } catch {
-    // Continua con il fallback delle variabili d'ambiente
+    // Non in ambiente Node o record assente
   }
 
   const envTag =
@@ -61,26 +104,56 @@ export function getAmazonAffiliateTag(): string {
 }
 
 /**
- * Aggiorna il Tag di Affiliazione Amazon centralizzato nel database.
+ * Aggiorna il Tag di Affiliazione Amazon centralizzato nel database e in cache.
  */
-export function setAmazonAffiliateTag(tag: string): void {
+export async function setAmazonAffiliateTag(tag: string): Promise<void> {
   const cleanTag = tag.trim();
   const now = Date.now();
+  cachedAffiliateTag = cleanTag;
 
-  const existing = db
-    .select()
-    .from(siteSettings)
-    .where(eq(siteSettings.key, SETTING_KEY_AMAZON_AFFILIATE_TAG))
-    .get();
-
-  if (existing) {
-    db.update(siteSettings)
-      .set({ value: cleanTag, updatedAt: now })
+  try {
+    const database = await getDb();
+    const rows = await database
+      .select()
+      .from(siteSettings)
       .where(eq(siteSettings.key, SETTING_KEY_AMAZON_AFFILIATE_TAG))
-      .run();
-  } else {
-    db.insert(siteSettings)
-      .values({ key: SETTING_KEY_AMAZON_AFFILIATE_TAG, value: cleanTag, updatedAt: now })
-      .run();
+      .limit(1);
+
+    if (rows && rows.length > 0) {
+      await database
+        .update(siteSettings)
+        .set({ value: cleanTag, updatedAt: now })
+        .where(eq(siteSettings.key, SETTING_KEY_AMAZON_AFFILIATE_TAG));
+    } else {
+      await database.insert(siteSettings).values({
+        key: SETTING_KEY_AMAZON_AFFILIATE_TAG,
+        value: cleanTag,
+        updatedAt: now,
+      });
+    }
+  } catch {
+    // Fallback sync su Node
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { nodeDb } = require("@/db/node");
+      const existing = nodeDb
+        .select()
+        .from(siteSettings)
+        .where(eq(siteSettings.key, SETTING_KEY_AMAZON_AFFILIATE_TAG))
+        .get();
+
+      if (existing) {
+        nodeDb.update(siteSettings)
+          .set({ value: cleanTag, updatedAt: now })
+          .where(eq(siteSettings.key, SETTING_KEY_AMAZON_AFFILIATE_TAG))
+          .run();
+      } else {
+        nodeDb.insert(siteSettings)
+          .values({ key: SETTING_KEY_AMAZON_AFFILIATE_TAG, value: cleanTag, updatedAt: now })
+          .run();
+      }
+    } catch (e) {
+      console.error("Errore salvataggio affiliate tag:", e);
+    }
   }
 }

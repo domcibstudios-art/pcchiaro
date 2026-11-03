@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { db } from "../db";
+import { getDb } from "../db";
 import { loginAttempts } from "../db/schema";
 import { eq, and, gt, desc } from "drizzle-orm";
 
@@ -80,17 +80,17 @@ export function verifySessionToken(token: string, secret: string): SessionPayloa
 const MAX_FAILED_ATTEMPTS = 5;
 const WINDOW_MS = 15 * 60 * 1000; // 15 minuti
 
-export function isIpRateLimited(ipAddress: string): boolean {
+export async function isIpRateLimited(ipAddress: string): Promise<boolean> {
   try {
+    const database = await getDb();
     const cutoff = Date.now() - WINDOW_MS;
-    const recentAttempts = db
+    const recentAttempts = await database
       .select()
       .from(loginAttempts)
       .where(and(eq(loginAttempts.ipAddress, ipAddress), gt(loginAttempts.attemptedAt, cutoff)))
-      .orderBy(desc(loginAttempts.attemptedAt))
-      .all();
+      .orderBy(desc(loginAttempts.attemptedAt));
 
-    const failedCount = recentAttempts.filter((a) => a.success === 0).length;
+    const failedCount = recentAttempts.filter((a: any) => a.success === 0).length;
     return failedCount >= MAX_FAILED_ATTEMPTS;
   } catch (error) {
     console.error("Errore verifica rate limit:", error);
@@ -98,16 +98,15 @@ export function isIpRateLimited(ipAddress: string): boolean {
   }
 }
 
-export function recordLoginAttempt(ipAddress: string, success: boolean): void {
+export async function recordLoginAttempt(ipAddress: string, success: boolean): Promise<void> {
   try {
-    db.insert(loginAttempts)
-      .values({
-        id: crypto.randomUUID(),
-        ipAddress,
-        attemptedAt: Date.now(),
-        success: success ? 1 : 0,
-      })
-      .run();
+    const database = await getDb();
+    await database.insert(loginAttempts).values({
+      id: crypto.randomUUID(),
+      ipAddress,
+      attemptedAt: Date.now(),
+      success: success ? 1 : 0,
+    });
   } catch (error) {
     console.error("Errore registrazione tentativo login:", error);
   }

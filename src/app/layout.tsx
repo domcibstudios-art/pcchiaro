@@ -24,7 +24,10 @@ const hankenGrotesk = Hanken_Grotesk({
 export const metadata: Metadata = {
   title: `${SITE_CONFIG.name} - ${SITE_CONFIG.tagline}`,
   description: SITE_CONFIG.description,
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://pcchiaro.domcibstudios.workers.dev"),
+  verification: {
+    google: "google83ee7aeee61dfeea",
+  },
 };
 
 export default function RootLayout({
@@ -44,6 +47,12 @@ export default function RootLayout({
         className={`${inter.variable} ${jetbrainsMono.variable} ${hankenGrotesk.variable} bg-surface-canvas text-slate-800 font-sans antialiased min-h-screen flex flex-col`}
       >
         {children}
+        {/* Cloudflare Web Analytics (0 Cookie / GDPR Compliant) */}
+        <script
+          defer
+          src="https://static.cloudflareinsights.com/beacon.min.js"
+          data-cf-beacon='{"token": "983e41e9d3254f98b93ec24961a95fa4"}'
+        />
       </body>
     </html>
   );

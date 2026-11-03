@@ -33,12 +33,18 @@ PCChiaro.it risponde all'esigenza di verificare in modo oggettivo cosa si nascon
 ## 2. Stack Tecnologico
 
 - **Frontend & Server Framework:** Next.js 15 (App Router con React 19 e Server Actions)
+- **Deployment & Edge Runtime:** Cloudflare Workers (tramite `@opennextjs/cloudflare`)
+- **Caching & CDN:** Cloudflare Workers Cache con tag purge globale (`ctx.cache.purge`)
+- **Database:** Cloudflare D1 (SQL Serverless a costo 0) in produzione, con fallback a SQLite locale (`better-sqlite3`) per sviluppo e test
 - **Linguaggio:** TypeScript (strict mode)
 - **Stile & Design System:** Tailwind CSS nativo (Palette Blu Cobalto `#1d4ed8`, font *Inter*, *Hanken Grotesk* e *JetBrains Mono*)
-- **Database:** SQLite su filesystem persistente con driver nativo `better-sqlite3` (modalità WAL attiva)
-- **ORM & Migrazioni:** Drizzle ORM + Drizzle Kit
+- **ORM & Migrazioni:** Drizzle ORM (`drizzle-orm/d1`) + Drizzle Kit
 - **Validazione:** Zod schemas
 - **Sicurezza & Autenticazione:** Hash Scrypt con salt crittografico, token di sessione firmati HMAC-SHA256, cookie `HttpOnly` / `SameSite=Lax`, protezione brute-force con blocco IP (5 tentativi / 15 min).
+
+> 📖 **Documentazione Operativa:**
+> - [Manuale di Deploy, Rollback e Manutenzione](docs/deployment-and-operations.md)
+> - [Guida Sviluppo Locale Cloudflare](docs/cloudflare-local-development.md)
 
 ---
 

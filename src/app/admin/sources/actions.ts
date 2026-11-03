@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { db } from "@/db";
+import { getDb } from "@/db";
 import { sources, reviews } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { requireAdmin } from "@/lib/session";
@@ -14,6 +14,7 @@ export async function saveSourceAction(
   formData: FormData
 ) {
   await requireAdmin();
+  const database = await getDb();
 
   const id = (formData.get("id") as string) || crypto.randomUUID();
   const isEditing = Boolean(formData.get("isEditing"));
@@ -25,8 +26,8 @@ export async function saveSourceAction(
   const notes = (formData.get("notes") as string)?.trim();
 
   // 1. Verifica che la recensione esista
-  const targetReview = db.select().from(reviews).where(eq(reviews.id, reviewId)).get();
-  if (!targetReview) {
+  const targetReviewRows = await database.select().from(reviews).where(eq(reviews.id, reviewId)).limit(1);
+  if (!targetReviewRows || targetReviewRows.length === 0) {
     return { error: "Recensione associata non trovata." };
   }
 
@@ -50,7 +51,8 @@ export async function saveSourceAction(
 
   try {
     if (isEditing) {
-      db.update(sources)
+      await database
+        .update(sources)
         .set({
           reviewId: validData.reviewId,
           url: validData.url,
@@ -59,10 +61,10 @@ export async function saveSourceAction(
           notes: validData.notes,
           consultedAt: now,
         })
-        .where(eq(sources.id, id))
-        .run();
+        .where(eq(sources.id, id));
     } else {
-      db.insert(sources)
+      await database
+        .insert(sources)
         .values({
           id,
           reviewId: validData.reviewId,
@@ -71,8 +73,7 @@ export async function saveSourceAction(
           sourceType: validData.sourceType,
           notes: validData.notes,
           consultedAt: now,
-        })
-        .run();
+        });
     }
   } catch (error: any) {
     return { error: `Errore durante il salvataggio: ${error.message}` };
@@ -87,8 +88,9 @@ export async function saveSourceAction(
 
 export async function deleteSourceAction(id: string) {
   await requireAdmin();
+  const database = await getDb();
 
-  db.delete(sources).where(eq(sources.id, id)).run();
+  await database.delete(sources).where(eq(sources.id, id));
 
   revalidatePath("/admin/sources");
   revalidatePath("/admin/reviews");

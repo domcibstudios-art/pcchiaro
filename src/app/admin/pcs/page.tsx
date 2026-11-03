@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { db } from "@/db";
+import { getDb } from "@/db";
 import { pcs, reviews, curatedAlternatives } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { archivePcAction, deletePcAction } from "./actions";
@@ -13,8 +13,9 @@ export default async function AdminPcsPage({
   searchParams: Promise<{ category?: string; status?: string }>;
 }) {
   const params = await searchParams;
-  const allPcs = db.select().from(pcs).all();
-  const allReviews = db.select().from(reviews).all();
+  const database = await getDb();
+  const allPcs = await database.select().from(pcs);
+  const allReviews = await database.select().from(reviews);
 
   // Filtraggio opzionale
   const filteredPcs = allPcs.filter((pc) => {

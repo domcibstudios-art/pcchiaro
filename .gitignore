@@ -53,3 +53,8 @@ desktop.ini
 # Temporary files & backups
 *.bak
 *.tmp
+
+# Cloudflare OpenNext & Wrangler
+.open-next/
+.wrangler/
+tsconfig.tsbuildinfo

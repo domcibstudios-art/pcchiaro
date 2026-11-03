@@ -2,11 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { db } from "@/db";
+import { getDb } from "@/db";
 import { reviews, pcs } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { requireAdmin } from "@/lib/session";
 import { reviewSchema, validateForPublication } from "@/lib/validations";
+import { invalidatePublicCache } from "@/lib/cache-invalidation";
 import crypto from "crypto";
 
 export async function saveReviewAction(
@@ -82,8 +83,10 @@ export async function saveReviewAction(
   const now = Date.now();
 
   try {
+    const database = await getDb();
     if (isEditing) {
-      db.update(reviews)
+      await database
+        .update(reviews)
         .set({
           pcId: validReview.pcId,
           slug: validReview.slug,
@@ -108,10 +111,10 @@ export async function saveReviewAction(
           publishedAt: validReview.status === "published" ? now : null,
           updatedAt: now,
         })
-        .where(eq(reviews.id, id))
-        .run();
+        .where(eq(reviews.id, id));
     } else {
-      db.insert(reviews)
+      await database
+        .insert(reviews)
         .values({
           id,
           pcId: validReview.pcId,
@@ -136,8 +139,7 @@ export async function saveReviewAction(
           status: validReview.status,
           publishedAt: validReview.status === "published" ? now : null,
           updatedAt: now,
-        })
-        .run();
+        });
     }
   } catch (error: any) {
     if (error.message?.includes("UNIQUE constraint failed: reviews.slug")) {
@@ -146,16 +148,18 @@ export async function saveReviewAction(
     return { error: `Errore durante il salvataggio: ${error.message}` };
   }
 
+  await invalidatePublicCache({ slug: validReview.slug });
   revalidatePath("/admin/reviews");
   revalidatePath("/admin");
-  revalidatePath("/");
   redirect("/admin/reviews");
 }
 
 export async function publishReviewAction(id: string) {
   await requireAdmin();
+  const database = await getDb();
 
-  const review = db.select().from(reviews).where(eq(reviews.id, id)).get();
+  const rows = await database.select().from(reviews).where(eq(reviews.id, id)).limit(1);
+  const review = rows && rows.length > 0 ? rows[0] : null;
   if (!review) throw new Error("Recensione non trovata.");
 
   let strengthsArr = [];
@@ -182,39 +186,48 @@ export async function publishReviewAction(id: string) {
   }
 
   const now = Date.now();
-  db.update(reviews)
+  await database
+    .update(reviews)
     .set({
       status: "published",
       publishedAt: review.publishedAt || now,
       updatedAt: now,
     })
-    .where(eq(reviews.id, id))
-    .run();
+    .where(eq(reviews.id, id));
 
+  await invalidatePublicCache({ slug: review.slug });
   revalidatePath("/admin/reviews");
   revalidatePath("/admin");
-  revalidatePath("/");
 }
 
 export async function unpublishReviewAction(id: string) {
   await requireAdmin();
-  db.update(reviews)
+  const database = await getDb();
+  const rows = await database.select().from(reviews).where(eq(reviews.id, id)).limit(1);
+  const review = rows && rows.length > 0 ? rows[0] : null;
+
+  await database
+    .update(reviews)
     .set({
       status: "draft",
       updatedAt: Date.now(),
     })
-    .where(eq(reviews.id, id))
-    .run();
+    .where(eq(reviews.id, id));
 
+  await invalidatePublicCache({ slug: review?.slug });
   revalidatePath("/admin/reviews");
   revalidatePath("/admin");
-  revalidatePath("/");
 }
 
 export async function deleteReviewAction(id: string) {
   await requireAdmin();
-  db.delete(reviews).where(eq(reviews.id, id)).run();
+  const database = await getDb();
+  const rows = await database.select().from(reviews).where(eq(reviews.id, id)).limit(1);
+  const review = rows && rows.length > 0 ? rows[0] : null;
+
+  await database.delete(reviews).where(eq(reviews.id, id));
+
+  await invalidatePublicCache({ slug: review?.slug });
   revalidatePath("/admin/reviews");
   revalidatePath("/admin");
-  revalidatePath("/");
 }

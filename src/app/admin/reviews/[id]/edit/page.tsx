@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { db } from "@/db";
+import { getDb } from "@/db";
 import { reviews, pcs } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import ReviewForm from "../../review-form";
@@ -12,20 +12,21 @@ export default async function EditReviewPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const review = db.select().from(reviews).where(eq(reviews.id, id)).get();
+  const database = await getDb();
+  const rows = await database.select().from(reviews).where(eq(reviews.id, id)).limit(1);
+  const review = rows && rows.length > 0 ? rows[0] : null;
 
   if (!review) {
     notFound();
   }
 
-  const availablePcs = db
+  const availablePcs = await database
     .select({
       id: pcs.id,
       modelName: pcs.modelName,
       brand: pcs.brand,
     })
-    .from(pcs)
-    .all();
+    .from(pcs);
 
   return (
     <div className="space-y-6">

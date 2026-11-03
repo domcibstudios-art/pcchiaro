@@ -1,8 +1,9 @@
-import { db } from "@/db";
+import { Suspense } from "react";
+import { getDb } from "@/db";
 import { pcs, reviews, priceOffers } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { SITE_CONFIG } from "@/config/site";
-import { getShowExactPrices } from "@/lib/settings";
+import { getShowExactPrices, getAmazonAffiliateTagAsync } from "@/lib/settings";
 import { buildAffiliateUrl } from "@/lib/affiliate";
 import SiteHeader from "@/components/public/site-header";
 import SiteFooter from "@/components/public/site-footer";
@@ -10,13 +11,17 @@ import BottomNav from "@/components/public/bottom-nav";
 import FilterFeed from "@/components/public/filter-feed";
 import { ReviewCardItem } from "@/components/public/review-card";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 1800; // Rigenerazione ogni 30 minuti per ridurre consumo CPU su Cloudflare
 
 export default async function HomePage() {
-  const showExactPrices = getShowExactPrices();
+  const db = await getDb();
+  const [showExactPrices, affiliateTag] = await Promise.all([
+    getShowExactPrices(),
+    getAmazonAffiliateTagAsync(),
+  ]);
 
-  // Query recensioni pubblicate dal database SQLite
-  const rawReviews = db
+  // Query recensioni pubblicate dal database
+  const rawReviews = await db
     .select({
       review: reviews,
       pc: pcs,
@@ -24,15 +29,13 @@ export default async function HomePage() {
     .from(reviews)
     .innerJoin(pcs, eq(reviews.pcId, pcs.id))
     .where(eq(reviews.status, "published"))
-    .orderBy(desc(reviews.updatedAt))
-    .all();
+    .orderBy(desc(reviews.updatedAt));
 
   // Recupera le offerte commerciali valide associate ai PC
-  const allOffers = db
+  const allOffers = await db
     .select()
     .from(priceOffers)
-    .where(eq(priceOffers.isValid, 1))
-    .all();
+    .where(eq(priceOffers.isValid, 1));
 
   // Crea la mappa pcId -> offerta migliore
   const offersByPcId = new Map<string, typeof priceOffers.$inferSelect>();
@@ -43,14 +46,14 @@ export default async function HomePage() {
   }
 
   // Prepara gli elementi per il feed pubblico
-  const feedItems: ReviewCardItem[] = rawReviews.map(({ review, pc }) => {
+  const feedItems: ReviewCardItem[] = rawReviews.map(({ review, pc }: any) => {
     const offer = offersByPcId.get(pc.id);
     return {
       review,
       pc,
       offer: offer
         ? {
-            affiliateUrl: buildAffiliateUrl(offer.cleanUrl || offer.affiliateUrl || offer.asin),
+            affiliateUrl: buildAffiliateUrl(offer.cleanUrl || offer.affiliateUrl || offer.asin, affiliateTag),
             cleanUrl: offer.cleanUrl,
             asin: offer.asin,
             priceAmountEur: offer.priceAmountEur,
@@ -101,7 +104,9 @@ export default async function HomePage() {
         </section>
 
         {/* FEED INTERATTIVO CON FILTRI E RICERCA */}
-        <FilterFeed items={feedItems} />
+        <Suspense fallback={<div className="py-12 text-center text-sm text-slate-500">Caricamento catalogo recensioni...</div>}>
+          <FilterFeed items={feedItems} />
+        </Suspense>
 
         {/* GUIDA RAPIDA AUTODIFESA HARDWARE */}
         <section id="autodifesa" className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-sm">

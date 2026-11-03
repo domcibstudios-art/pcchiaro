@@ -1,10 +1,11 @@
 "use server";
 
 import crypto from "node:crypto";
-import { db } from "@/db";
+import { getDb, executeBatch } from "@/db";
 import { pcs, reviews, sources, priceOffers } from "@/db/schema";
 import { requireAdmin } from "@/lib/session";
 import { revalidatePath } from "next/cache";
+import { invalidatePublicCache } from "@/lib/cache-invalidation";
 import { parseAmazonListing, extractAsinFromUrl, ExtractedHardwarePackage } from "@/lib/amazon-extractor";
 import { parseCsvText } from "@/lib/csv-parser";
 import { generateSeoMeta } from "@/lib/seo-engine";
@@ -135,109 +136,113 @@ export async function saveImportedPackageAction(pkg: ExtractedHardwarePackage): 
   const reviewId = crypto.randomUUID();
 
   try {
-    // Transazione atomica SQLite
-    db.transaction((tx) => {
-      // 1. Inserimento PC nel catalogo (stato: draft)
-      tx.insert(pcs)
-        .values({
-          id: pcId,
-          brand: pkg.pc.brand,
-          modelName: pkg.pc.modelName,
-          exactConfig: pkg.pc.exactConfig,
-          category: pkg.pc.category,
-          imageUrl: pkg.pc.imageUrl || null,
-          imageAlt: pkg.pc.imageAlt || null,
-          cpuModel: pkg.pc.cpuModel,
-          cpuGen: pkg.pc.cpuGen || null,
-          cpuCoresThreads: pkg.pc.cpuCoresThreads || null,
-          cpuWin11Support: pkg.pc.cpuWin11Support,
-          gpuModel: pkg.pc.gpuModel,
-          gpuVramGb: pkg.pc.gpuVramGb || null,
-          gpuType: pkg.pc.gpuType,
-          gpuDlssFsr: pkg.pc.gpuDlssFsr || null,
-          ramGb: pkg.pc.ramGb,
-          ramType: pkg.pc.ramType,
-          ramChannel: pkg.pc.ramChannel,
-          ramSpeedMhz: pkg.pc.ramSpeedMhz || null,
-          storageType: pkg.pc.storageType,
-          storageCapacityGb: pkg.pc.storageCapacityGb,
-          storageDetails: pkg.pc.storageDetails || null,
-          motherboardChipset: pkg.pc.motherboardChipset || null,
-          psuWattage: pkg.pc.psuWattage || null,
-          psuRating: pkg.pc.psuRating || null,
-          osInstalled: pkg.pc.osInstalled,
-          osOfficialSupport: pkg.pc.osOfficialSupport,
-          unverifiedSpecs: JSON.stringify(pkg.pc.unverifiedSpecs || []),
-          editorialStatus: "draft",
-          createdAt: now,
-          updatedAt: now,
-        })
-        .run();
+    const database = await getDb();
+    const batchStatements: any[] = [];
 
-      // 2. Inserimento Recensione associata (stato: draft)
-      tx.insert(reviews)
-        .values({
-          id: reviewId,
-          pcId: pcId,
-          slug: pkg.review.slug,
-          title: pkg.review.title,
-          metaTitle: pkg.review.metaTitle || null,
-          metaDescription: pkg.review.metaDescription || null,
-          verdict: pkg.review.verdict,
-          summaryIntro: pkg.review.summaryIntro,
-          whyPositiveReviews: pkg.review.whyPositiveReviews || null,
-          strengths: JSON.stringify(pkg.review.strengths || []),
-          weaknesses: JSON.stringify(pkg.review.weaknesses || []),
-          evidenceLevel: pkg.review.evidenceLevel,
-          ratingGaming: pkg.review.ratingGaming,
-          notesGaming: pkg.review.notesGaming,
-          ratingWork: pkg.review.ratingWork,
-          notesWork: pkg.review.notesWork,
-          ratingOffice: pkg.review.ratingOffice,
-          notesOffice: pkg.review.notesOffice,
-          status: "draft",
-          updatedAt: now,
-        })
-        .run();
+    // 1. Inserimento PC nel catalogo (stato: draft)
+    batchStatements.push(
+      database.insert(pcs).values({
+        id: pcId,
+        brand: pkg.pc.brand,
+        modelName: pkg.pc.modelName,
+        exactConfig: pkg.pc.exactConfig,
+        category: pkg.pc.category,
+        imageUrl: pkg.pc.imageUrl || null,
+        imageAlt: pkg.pc.imageAlt || null,
+        cpuModel: pkg.pc.cpuModel,
+        cpuGen: pkg.pc.cpuGen || null,
+        cpuCoresThreads: pkg.pc.cpuCoresThreads || null,
+        cpuWin11Support: pkg.pc.cpuWin11Support,
+        gpuModel: pkg.pc.gpuModel,
+        gpuVramGb: pkg.pc.gpuVramGb || null,
+        gpuType: pkg.pc.gpuType,
+        gpuDlssFsr: pkg.pc.gpuDlssFsr || null,
+        ramGb: pkg.pc.ramGb,
+        ramType: pkg.pc.ramType,
+        ramChannel: pkg.pc.ramChannel,
+        ramSpeedMhz: pkg.pc.ramSpeedMhz || null,
+        storageType: pkg.pc.storageType,
+        storageCapacityGb: pkg.pc.storageCapacityGb,
+        storageDetails: pkg.pc.storageDetails || null,
+        motherboardChipset: pkg.pc.motherboardChipset || null,
+        psuWattage: pkg.pc.psuWattage || null,
+        psuRating: pkg.pc.psuRating || null,
+        osInstalled: pkg.pc.osInstalled,
+        osOfficialSupport: pkg.pc.osOfficialSupport,
+        unverifiedSpecs: JSON.stringify(pkg.pc.unverifiedSpecs || []),
+        editorialStatus: "draft",
+        createdAt: now,
+        updatedAt: now,
+      })
+    );
 
-      // 3. Inserimento Fonti associate alla recensione
-      if (pkg.sources && pkg.sources.length > 0) {
-        for (const s of pkg.sources) {
-          tx.insert(sources)
-            .values({
-              id: crypto.randomUUID(),
-              reviewId: reviewId,
-              sourceName: s.sourceName,
-              sourceType: s.sourceType,
-              url: s.url,
-              notes: s.notes,
-              consultedAt: now,
-            })
-            .run();
-        }
-      }
+    // 2. Inserimento Recensione associata (stato: draft)
+    batchStatements.push(
+      database.insert(reviews).values({
+        id: reviewId,
+        pcId: pcId,
+        slug: pkg.review.slug,
+        title: pkg.review.title,
+        metaTitle: pkg.review.metaTitle || null,
+        metaDescription: pkg.review.metaDescription || null,
+        verdict: pkg.review.verdict,
+        summaryIntro: pkg.review.summaryIntro,
+        whyPositiveReviews: pkg.review.whyPositiveReviews || null,
+        strengths: JSON.stringify(pkg.review.strengths || []),
+        weaknesses: JSON.stringify(pkg.review.weaknesses || []),
+        evidenceLevel: pkg.review.evidenceLevel,
+        ratingGaming: pkg.review.ratingGaming,
+        notesGaming: pkg.review.notesGaming,
+        ratingWork: pkg.review.ratingWork,
+        notesWork: pkg.review.notesWork,
+        ratingOffice: pkg.review.ratingOffice,
+        notesOffice: pkg.review.notesOffice,
+        status: "draft",
+        updatedAt: now,
+      })
+    );
 
-      // 4. Inserimento Offerta Commerciale collegata al PC
-      if (pkg.offer && pkg.offer.affiliateUrl) {
-        tx.insert(priceOffers)
-          .values({
+    // 3. Inserimento Fonti associate alla recensione
+    if (pkg.sources && pkg.sources.length > 0) {
+      for (const s of pkg.sources) {
+        batchStatements.push(
+          database.insert(sources).values({
             id: crypto.randomUUID(),
-            pcId: pcId,
-            retailer: pkg.offer.retailer || "Amazon.it",
-            affiliateUrl: pkg.offer.affiliateUrl,
-            asin: pkg.offer.asin || null,
-            priceAmountEur: pkg.offer.priceAmountEur || null,
-            currency: pkg.offer.currency || "EUR",
-            dataSource: pkg.offer.dataSource || "manual_check",
-            isValid: 1,
-            lastVerifiedAt: now,
-            createdAt: now,
+            reviewId: reviewId,
+            sourceName: s.sourceName,
+            sourceType: s.sourceType,
+            url: s.url,
+            notes: s.notes,
+            consultedAt: now,
           })
-          .run();
+        );
       }
-    });
+    }
 
-    // Revalida le rotte dell'area amministrativa
+    // 4. Inserimento Offerta Commerciale collegata al PC
+    if (pkg.offer && pkg.offer.affiliateUrl) {
+      batchStatements.push(
+        database.insert(priceOffers).values({
+          id: crypto.randomUUID(),
+          pcId: pcId,
+          retailer: pkg.offer.retailer || "Amazon.it",
+          affiliateUrl: pkg.offer.affiliateUrl,
+          asin: pkg.offer.asin || null,
+          priceAmountEur: pkg.offer.priceAmountEur || null,
+          currency: pkg.offer.currency || "EUR",
+          dataSource: pkg.offer.dataSource || "manual_check",
+          isValid: 1,
+          lastVerifiedAt: now,
+          createdAt: now,
+        })
+      );
+    }
+
+    // Esecuzione batch atomico con rollback
+    await executeBatch(database, batchStatements);
+
+    // Revalida le rotte dell'area amministrativa e la cache pubblica
+    await invalidatePublicCache({ slug: pkg.review.slug });
     revalidatePath("/admin");
     revalidatePath("/admin/pcs");
     revalidatePath("/admin/reviews");
@@ -289,157 +294,163 @@ export async function importCsvContentAction(csvText: string): Promise<{
   let importedCount = 0;
 
   try {
-    db.transaction((tx) => {
-      for (const parts of rows) {
-        const asin = getCol(parts, "asin", 0);
-        const brand = getCol(parts, "brand", 1);
-        const modello = getCol(parts, "modello", 2);
-        const categoria = getCol(parts, "categoria", 3);
-        const cpuModello = getCol(parts, "cpu_modello", 4);
-        const cpuGen = getCol(parts, "cpu_gen", 5);
-        const cpuWin11 = getCol(parts, "cpu_win11_support", 6);
-        const gpuModello = getCol(parts, "gpu_modello", 7);
-        const gpuTipo = getCol(parts, "gpu_tipo", 8);
-        const gpuVram = getCol(parts, "gpu_vram_gb", 9);
-        const ramGb = getCol(parts, "ram_gb", 10);
-        const ramTipo = getCol(parts, "ram_tipo", 11);
-        const ramCanale = getCol(parts, "ram_canale", 12);
-        const storageGb = getCol(parts, "storage_gb", 13);
-        const storageTipo = getCol(parts, "storage_tipo", 14);
-        const verdetto = getCol(parts, "verdetto", 15);
-        const titoloRecensione = getCol(parts, "titolo_recensione", 16);
-        const sommarioIntro = getCol(parts, "sommario_intro", 17);
-        const semaforoGaming = getCol(parts, "semaforo_gaming", 18);
-        const noteGaming = getCol(parts, "note_gaming", 19);
-        const semaforoLavoro = getCol(parts, "semaforo_lavoro", 20);
-        const noteLavoro = getCol(parts, "note_lavoro", 21);
-        const semaforoUfficio = getCol(parts, "semaforo_ufficio", 22);
-        const noteUfficio = getCol(parts, "note_ufficio", 23);
-        const puntiForza = getCol(parts, "punti_forza", 24);
-        const criticita = getCol(parts, "criticita", 25);
-        const prezzoIndicativo = getCol(parts, "prezzo_indicativo", 26);
-        const amazonUrl = getCol(parts, "amazon_url", 27);
+    const database = await getDb();
+    const batchStatements: any[] = [];
 
-        if (!brand || !modello || !cpuModello) continue;
+    for (const parts of rows) {
+      const asin = getCol(parts, "asin", 0);
+      const brand = getCol(parts, "brand", 1);
+      const modello = getCol(parts, "modello", 2);
+      const categoria = getCol(parts, "categoria", 3);
+      const cpuModello = getCol(parts, "cpu_modello", 4);
+      const cpuGen = getCol(parts, "cpu_gen", 5);
+      const cpuWin11 = getCol(parts, "cpu_win11_support", 6);
+      const gpuModello = getCol(parts, "gpu_modello", 7);
+      const gpuTipo = getCol(parts, "gpu_tipo", 8);
+      const gpuVram = getCol(parts, "gpu_vram_gb", 9);
+      const ramGb = getCol(parts, "ram_gb", 10);
+      const ramTipo = getCol(parts, "ram_tipo", 11);
+      const ramCanale = getCol(parts, "ram_canale", 12);
+      const storageGb = getCol(parts, "storage_gb", 13);
+      const storageTipo = getCol(parts, "storage_tipo", 14);
+      const verdetto = getCol(parts, "verdetto", 15);
+      const titoloRecensione = getCol(parts, "titolo_recensione", 16);
+      const sommarioIntro = getCol(parts, "sommario_intro", 17);
+      const semaforoGaming = getCol(parts, "semaforo_gaming", 18);
+      const noteGaming = getCol(parts, "note_gaming", 19);
+      const semaforoLavoro = getCol(parts, "semaforo_lavoro", 20);
+      const noteLavoro = getCol(parts, "note_lavoro", 21);
+      const semaforoUfficio = getCol(parts, "semaforo_ufficio", 22);
+      const noteUfficio = getCol(parts, "note_ufficio", 23);
+      const puntiForza = getCol(parts, "punti_forza", 24);
+      const criticita = getCol(parts, "criticita", 25);
+      const prezzoIndicativo = getCol(parts, "prezzo_indicativo", 26);
+      const amazonUrl = getCol(parts, "amazon_url", 27);
 
-        const pcId = crypto.randomUUID();
-        const reviewId = crypto.randomUUID();
-        const slug =
-          (titoloRecensione || modello)
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, "-")
-            .replace(/^-+|-+$/g, "")
-            .slice(0, 60) + (asin ? `-${asin.toLowerCase()}` : `-${Date.now().toString(36)}`);
+      if (!brand || !modello || !cpuModello) continue;
 
-        const strengthsArray = puntiForza
-          ? puntiForza.split("|").map((s) => s.trim()).filter(Boolean)
-          : [];
-        const weaknessesArray = criticita
-          ? criticita.split("|").map((s) => s.trim()).filter(Boolean)
-          : [];
+      const pcId = crypto.randomUUID();
+      const reviewId = crypto.randomUUID();
+      const slug =
+        (titoloRecensione || modello)
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-+|-+$/g, "")
+          .slice(0, 60) + (asin ? `-${asin.toLowerCase()}` : `-${Date.now().toString(36)}`);
 
-        // Genera automaticamente i Meta SEO ad alto CTR se non forniti
-        const { title: autoMetaTitle, description: autoMetaDesc } = generateSeoMeta(
-          {
-            title: titoloRecensione || modello,
-            summaryIntro: sommarioIntro || `Bozza importata da CSV per ${brand} ${modello}.`,
-            verdict: (verdetto as any) || "accettabile_base",
-            ratingGaming: (semaforoGaming as any) || "limitato",
-            notesGaming: noteGaming || "",
-            ratingWork: (semaforoLavoro as any) || "limitato",
-            notesWork: noteLavoro || "",
-            ratingOffice: (semaforoUfficio as any) || "idoneo",
-            notesOffice: noteUfficio || "",
-          },
-          {
-            brand: brand || "Brand Generico",
-            modelName: modello,
-            cpuModel: cpuModello,
-            cpuGen: cpuGen || null,
-            cpuWin11Support: cpuWin11 === "0" ? 0 : 1,
-            gpuModel: gpuModello || "Integrata",
-            gpuType: (gpuTipo as any) || "integrated",
-            ramGb: parseInt(ramGb, 10) || 16,
-            ramType: ramTipo || "DDR4",
-            ramChannel: (ramCanale as any) || "dual",
-            storageCapacityGb: parseInt(storageGb, 10) || 512,
-            storageType: storageTipo || "NVMe",
-            osOfficialSupport: cpuWin11 === "0" ? 0 : 1,
-          }
-        );
+      const strengthsArray = puntiForza
+        ? puntiForza.split("|").map((s) => s.trim()).filter(Boolean)
+        : [];
+      const weaknessesArray = criticita
+        ? criticita.split("|").map((s) => s.trim()).filter(Boolean)
+        : [];
 
-        tx.insert(pcs)
-          .values({
-            id: pcId,
-            brand: brand || "Brand Generico",
-            modelName: modello,
-            exactConfig: `${cpuModello} / ${gpuModello || "Integrata"} / ${ramGb || 16}GB / ${storageGb || 512}GB`,
-            category: (categoria as any) || "desktop_office",
-            cpuModel: cpuModello,
-            cpuGen: cpuGen || null,
-            cpuWin11Support: cpuWin11 === "0" ? 0 : 1,
-            gpuModel: gpuModello || "Integrata",
-            gpuVramGb: gpuVram ? parseInt(gpuVram, 10) : null,
-            gpuType: (gpuTipo as any) || "integrated",
-            ramGb: parseInt(ramGb, 10) || 16,
-            ramType: ramTipo || "DDR4",
-            ramChannel: (ramCanale as any) || "dual",
-            storageType: storageTipo || "NVMe",
-            storageCapacityGb: parseInt(storageGb, 10) || 512,
-            osInstalled: "Windows 11",
-            osOfficialSupport: cpuWin11 === "0" ? 0 : 1,
-            editorialStatus: "draft",
-            createdAt: now,
-            updatedAt: now,
-          })
-          .run();
-
-        tx.insert(reviews)
-          .values({
-            id: reviewId,
-            pcId: pcId,
-            slug,
-            title: titoloRecensione || modello,
-            metaTitle: autoMetaTitle,
-            metaDescription: autoMetaDesc,
-            summaryIntro: sommarioIntro || `Bozza importata da CSV per ${brand} ${modello}.`,
-            verdict: (verdetto as any) || "accettabile_base",
-            evidenceLevel: "specifiche_dichiarate",
-            strengths: JSON.stringify(strengthsArray),
-            weaknesses: JSON.stringify(weaknessesArray),
-            ratingGaming: (semaforoGaming as any) || "limitato",
-            notesGaming: noteGaming || "",
-            ratingWork: (semaforoLavoro as any) || "limitato",
-            notesWork: noteLavoro || "",
-            ratingOffice: (semaforoUfficio as any) || "idoneo",
-            notesOffice: noteUfficio || "",
-            status: "draft",
-            updatedAt: now,
-          })
-          .run();
-
-        if (amazonUrl || asin) {
-          tx.insert(priceOffers)
-            .values({
-              id: crypto.randomUUID(),
-              pcId: pcId,
-              retailer: "Amazon.it",
-              affiliateUrl: amazonUrl || `https://www.amazon.it/dp/${asin}`,
-              asin: asin || null,
-              priceAmountEur: prezzoIndicativo ? parseFloat(prezzoIndicativo.replace(",", ".")) : null,
-              currency: "EUR",
-              dataSource: "csv_import",
-              isValid: 1,
-              lastVerifiedAt: now,
-              createdAt: now,
-            })
-            .run();
+      // Genera automaticamente i Meta SEO ad alto CTR se non forniti
+      const { title: autoMetaTitle, description: autoMetaDesc } = generateSeoMeta(
+        {
+          title: titoloRecensione || modello,
+          summaryIntro: sommarioIntro || `Bozza importata da CSV per ${brand} ${modello}.`,
+          verdict: (verdetto as any) || "accettabile_base",
+          ratingGaming: (semaforoGaming as any) || "limitato",
+          notesGaming: noteGaming || "",
+          ratingWork: (semaforoLavoro as any) || "limitato",
+          notesWork: noteLavoro || "",
+          ratingOffice: (semaforoUfficio as any) || "idoneo",
+          notesOffice: noteUfficio || "",
+        },
+        {
+          brand: brand || "Brand Generico",
+          modelName: modello,
+          cpuModel: cpuModello,
+          cpuGen: cpuGen || null,
+          cpuWin11Support: cpuWin11 === "0" ? 0 : 1,
+          gpuModel: gpuModello || "Integrata",
+          gpuType: (gpuTipo as any) || "integrated",
+          ramGb: parseInt(ramGb, 10) || 16,
+          ramType: ramTipo || "DDR4",
+          ramChannel: (ramCanale as any) || "dual",
+          storageCapacityGb: parseInt(storageGb, 10) || 512,
+          storageType: storageTipo || "NVMe",
+          osOfficialSupport: cpuWin11 === "0" ? 0 : 1,
         }
+      );
 
-        importedCount++;
+      batchStatements.push(
+        database.insert(pcs).values({
+          id: pcId,
+          brand: brand || "Brand Generico",
+          modelName: modello,
+          exactConfig: `${cpuModello} / ${gpuModello || "Integrata"} / ${ramGb || 16}GB / ${storageGb || 512}GB`,
+          category: (categoria as any) || "desktop_office",
+          cpuModel: cpuModello,
+          cpuGen: cpuGen || null,
+          cpuWin11Support: cpuWin11 === "0" ? 0 : 1,
+          gpuModel: gpuModello || "Integrata",
+          gpuVramGb: gpuVram ? parseInt(gpuVram, 10) : null,
+          gpuType: (gpuTipo as any) || "integrated",
+          ramGb: parseInt(ramGb, 10) || 16,
+          ramType: ramTipo || "DDR4",
+          ramChannel: (ramCanale as any) || "dual",
+          storageType: storageTipo || "NVMe",
+          storageCapacityGb: parseInt(storageGb, 10) || 512,
+          osInstalled: "Windows 11",
+          osOfficialSupport: cpuWin11 === "0" ? 0 : 1,
+          editorialStatus: "draft",
+          createdAt: now,
+          updatedAt: now,
+        })
+      );
+
+      batchStatements.push(
+        database.insert(reviews).values({
+          id: reviewId,
+          pcId: pcId,
+          slug,
+          title: titoloRecensione || modello,
+          metaTitle: autoMetaTitle,
+          metaDescription: autoMetaDesc,
+          summaryIntro: sommarioIntro || `Bozza importata da CSV per ${brand} ${modello}.`,
+          verdict: (verdetto as any) || "accettabile_base",
+          evidenceLevel: "specifiche_dichiarate",
+          strengths: JSON.stringify(strengthsArray),
+          weaknesses: JSON.stringify(weaknessesArray),
+          ratingGaming: (semaforoGaming as any) || "limitato",
+          notesGaming: noteGaming || "",
+          ratingWork: (semaforoLavoro as any) || "limitato",
+          notesWork: noteLavoro || "",
+          ratingOffice: (semaforoUfficio as any) || "idoneo",
+          notesOffice: noteUfficio || "",
+          status: "draft",
+          updatedAt: now,
+        })
+      );
+
+      if (amazonUrl || asin) {
+        batchStatements.push(
+          database.insert(priceOffers).values({
+            id: crypto.randomUUID(),
+            pcId: pcId,
+            retailer: "Amazon.it",
+            affiliateUrl: amazonUrl || `https://www.amazon.it/dp/${asin}`,
+            asin: asin || null,
+            priceAmountEur: prezzoIndicativo ? parseFloat(prezzoIndicativo.replace(",", ".")) : null,
+            currency: "EUR",
+            dataSource: "csv_import",
+            isValid: 1,
+            lastVerifiedAt: now,
+            createdAt: now,
+          })
+        );
       }
-    });
 
+      importedCount++;
+    }
+
+    if (batchStatements.length > 0) {
+      await executeBatch(database, batchStatements);
+    }
+
+    await invalidatePublicCache();
     revalidatePath("/admin");
     revalidatePath("/admin/pcs");
     revalidatePath("/admin/reviews");

@@ -2,12 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { db } from "@/db";
+import { getDb } from "@/db";
 import { priceOffers, pcs, siteSettings } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { requireAdmin } from "@/lib/session";
 import { priceOfferSchema } from "@/lib/validations";
 import { getShowExactPrices, setAmazonAffiliateTag } from "@/lib/settings";
+import { invalidatePublicCache } from "@/lib/cache-invalidation";
 import crypto from "crypto";
 
 export async function updateAmazonAffiliateTagAction(
@@ -17,9 +18,9 @@ export async function updateAmazonAffiliateTagAction(
   await requireAdmin();
 
   const tag = (formData.get("amazonAffiliateTag") as string) || "";
-  setAmazonAffiliateTag(tag.trim());
+  await setAmazonAffiliateTag(tag.trim());
 
-  revalidatePath("/");
+  await invalidatePublicCache();
   revalidatePath("/admin");
   revalidatePath("/admin/prices");
   revalidatePath("/admin/reviews");
@@ -30,29 +31,32 @@ export async function updateAmazonAffiliateTagAction(
 
 export async function toggleShowExactPricesAction() {
   await requireAdmin();
+  const database = await getDb();
 
-  const current = getShowExactPrices();
+  const current = await getShowExactPrices();
   const newValue = current ? "false" : "true";
   const now = Date.now();
 
-  const existing = db
+  const existingRows = await database
     .select()
     .from(siteSettings)
     .where(eq(siteSettings.key, "show_exact_prices"))
-    .get();
+    .limit(1);
 
-  if (existing) {
-    db.update(siteSettings)
+  if (existingRows && existingRows.length > 0) {
+    await database
+      .update(siteSettings)
       .set({ value: newValue, updatedAt: now })
-      .where(eq(siteSettings.key, "show_exact_prices"))
-      .run();
+      .where(eq(siteSettings.key, "show_exact_prices"));
   } else {
-    db.insert(siteSettings)
-      .values({ key: "show_exact_prices", value: newValue, updatedAt: now })
-      .run();
+    await database.insert(siteSettings).values({
+      key: "show_exact_prices",
+      value: newValue,
+      updatedAt: now,
+    });
   }
 
-  revalidatePath("/");
+  await invalidatePublicCache();
   revalidatePath("/admin");
   revalidatePath("/admin/prices");
   revalidatePath("/admin/reviews");
@@ -63,6 +67,7 @@ export async function savePriceOfferAction(
   formData: FormData
 ) {
   await requireAdmin();
+  const database = await getDb();
 
   const id = (formData.get("id") as string) || crypto.randomUUID();
   const isEditing = Boolean(formData.get("isEditing"));
@@ -80,8 +85,8 @@ export async function savePriceOfferAction(
   const notes = (formData.get("notes") as string)?.trim() || null;
 
   // 1. Verifica che il PC esista
-  const targetPc = db.select().from(pcs).where(eq(pcs.id, pcId)).get();
-  if (!targetPc) {
+  const targetPcRows = await database.select().from(pcs).where(eq(pcs.id, pcId)).limit(1);
+  if (!targetPcRows || targetPcRows.length === 0) {
     return { error: "PC associato non trovato nel catalogo." };
   }
 
@@ -110,7 +115,8 @@ export async function savePriceOfferAction(
 
   try {
     if (isEditing) {
-      db.update(priceOffers)
+      await database
+        .update(priceOffers)
         .set({
           pcId: validData.pcId,
           retailer: validData.retailer,
@@ -124,10 +130,10 @@ export async function savePriceOfferAction(
           notes: validData.notes || null,
           lastVerifiedAt: now,
         })
-        .where(eq(priceOffers.id, id))
-        .run();
+        .where(eq(priceOffers.id, id));
     } else {
-      db.insert(priceOffers)
+      await database
+        .insert(priceOffers)
         .values({
           id,
           pcId: validData.pcId,
@@ -142,61 +148,64 @@ export async function savePriceOfferAction(
           notes: validData.notes || null,
           lastVerifiedAt: now,
           createdAt: now,
-        })
-        .run();
+        });
     }
   } catch (error: any) {
     return { error: `Errore durante il salvataggio: ${error.message}` };
   }
 
+  await invalidatePublicCache();
   revalidatePath("/admin/prices");
   revalidatePath("/admin");
-  revalidatePath("/");
   redirect("/admin/prices");
 }
 
 export async function verifyPriceOfferAction(id: string) {
   await requireAdmin();
+  const database = await getDb();
 
-  db.update(priceOffers)
+  await database
+    .update(priceOffers)
     .set({
       lastVerifiedAt: Date.now(),
     })
-    .where(eq(priceOffers.id, id))
-    .run();
+    .where(eq(priceOffers.id, id));
 
+  await invalidatePublicCache();
   revalidatePath("/admin/prices");
   revalidatePath("/admin");
-  revalidatePath("/");
 }
 
 export async function toggleOfferValidityAction(id: string) {
   await requireAdmin();
+  const database = await getDb();
 
-  const offer = db.select().from(priceOffers).where(eq(priceOffers.id, id)).get();
+  const rows = await database.select().from(priceOffers).where(eq(priceOffers.id, id)).limit(1);
+  const offer = rows && rows.length > 0 ? rows[0] : null;
   if (!offer) throw new Error("Offerta non trovata.");
 
   const newStatus = offer.isValid === 1 ? 0 : 1;
 
-  db.update(priceOffers)
+  await database
+    .update(priceOffers)
     .set({
       isValid: newStatus,
       lastVerifiedAt: Date.now(),
     })
-    .where(eq(priceOffers.id, id))
-    .run();
+    .where(eq(priceOffers.id, id));
 
+  await invalidatePublicCache();
   revalidatePath("/admin/prices");
   revalidatePath("/admin");
-  revalidatePath("/");
 }
 
 export async function deletePriceOfferAction(id: string) {
   await requireAdmin();
+  const database = await getDb();
 
-  db.delete(priceOffers).where(eq(priceOffers.id, id)).run();
+  await database.delete(priceOffers).where(eq(priceOffers.id, id));
 
+  await invalidatePublicCache();
   revalidatePath("/admin/prices");
   revalidatePath("/admin");
-  revalidatePath("/");
 }

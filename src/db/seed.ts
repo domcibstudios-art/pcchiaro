@@ -1,4 +1,4 @@
-import { db, sqlite } from "./index";
+import { nodeDb as db, sqlite } from "./node";
 import { pcs, reviews, curatedAlternatives, priceOffers, sources } from "./schema";
 
 export function seedDemoData() {

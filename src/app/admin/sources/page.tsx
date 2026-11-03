@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { db } from "@/db";
+import { getDb } from "@/db";
 import { sources, reviews } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { deleteSourceAction } from "./actions";
@@ -13,15 +13,15 @@ export default async function AdminSourcesPage({
   searchParams: Promise<{ reviewId?: string; type?: string }>;
 }) {
   const params = await searchParams;
+  const database = await getDb();
 
-  const allSources = db
+  const allSources = await database
     .select({
       source: sources,
       review: reviews,
     })
     .from(sources)
-    .innerJoin(reviews, eq(sources.reviewId, reviews.id))
-    .all();
+    .innerJoin(reviews, eq(sources.reviewId, reviews.id));
 
   const filtered = allSources.filter(({ source }) => {
     if (params.reviewId && source.reviewId !== params.reviewId) return false;

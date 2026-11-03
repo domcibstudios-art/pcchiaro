@@ -71,8 +71,18 @@ export async function middleware(request: NextRequest) {
     if (!isLoginPage && !isAuthenticated) {
       const loginUrl = new URL("/admin/login", request.url);
       loginUrl.searchParams.set("from", pathname);
-      return NextResponse.redirect(loginUrl);
+      const redirectResponse = NextResponse.redirect(loginUrl);
+      redirectResponse.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+      redirectResponse.headers.set("Pragma", "no-cache");
+      redirectResponse.headers.set("Vary", "Cookie");
+      return redirectResponse;
     }
+
+    const adminResponse = NextResponse.next();
+    adminResponse.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    adminResponse.headers.set("Pragma", "no-cache");
+    adminResponse.headers.set("Vary", "Cookie");
+    return adminResponse;
   }
 
   return NextResponse.next();

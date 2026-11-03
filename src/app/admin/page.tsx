@@ -1,41 +1,42 @@
 import Link from "next/link";
-import { db } from "@/db";
+import { getDb } from "@/db";
 import { pcs, reviews, priceOffers, curatedAlternatives } from "@/db/schema";
 import { eq, count, lt } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminDashboardPage() {
+  const database = await getDb();
   const now = Date.now();
   const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
 
   // 1. Statistiche PC
-  const allPcs = db.select().from(pcs).all();
+  const allPcs = await database.select().from(pcs);
   const totalPcsCount = allPcs.length;
-  const publishedPcsCount = allPcs.filter((p) => p.editorialStatus === "published").length;
-  const draftPcsCount = allPcs.filter((p) => p.editorialStatus === "draft").length;
-  const archivedPcsCount = allPcs.filter((p) => p.editorialStatus === "archived").length;
+  const publishedPcsCount = allPcs.filter((p: any) => p.editorialStatus === "published").length;
+  const draftPcsCount = allPcs.filter((p: any) => p.editorialStatus === "draft").length;
+  const archivedPcsCount = allPcs.filter((p: any) => p.editorialStatus === "archived").length;
 
   // 2. Statistiche Recensioni
-  const allReviews = db.select().from(reviews).all();
+  const allReviews = await database.select().from(reviews);
   const totalReviewsCount = allReviews.length;
-  const publishedReviewsCount = allReviews.filter((r) => r.status === "published").length;
-  const draftReviewsCount = allReviews.filter((r) => r.status === "draft").length;
+  const publishedReviewsCount = allReviews.filter((r: any) => r.status === "published").length;
+  const draftReviewsCount = allReviews.filter((r: any) => r.status === "draft").length;
 
   // 3. Contenuti da aggiornare (aggiornati da più di 30 giorni)
   const staleReviews = allReviews.filter(
-    (r) => r.status === "published" && r.updatedAt < thirtyDaysAgo
+    (r: any) => r.status === "published" && r.updatedAt < thirtyDaysAgo
   );
 
   // 4. Offerte da verificare (verificate più di 30 giorni fa o invalide)
-  const allOffers = db.select().from(priceOffers).all();
+  const allOffers = await database.select().from(priceOffers);
   const staleOffers = allOffers.filter(
-    (o) => o.isValid === 0 || o.lastVerifiedAt < thirtyDaysAgo
+    (o: any) => o.isValid === 0 || o.lastVerifiedAt < thirtyDaysAgo
   );
 
   // 5. Alternative in attesa di approvazione
-  const allAlternatives = db.select().from(curatedAlternatives).all();
-  const pendingAlternatives = allAlternatives.filter((a) => a.isApproved === 0);
+  const allAlternatives = await database.select().from(curatedAlternatives);
+  const pendingAlternatives = allAlternatives.filter((a: any) => a.isApproved === 0);
 
   return (
     <div className="space-y-8">

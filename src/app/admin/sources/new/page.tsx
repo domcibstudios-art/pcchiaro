@@ -1,4 +1,4 @@
-import { db } from "@/db";
+import { getDb } from "@/db";
 import { reviews } from "@/db/schema";
 import SourceForm from "../source-form";
 
@@ -10,14 +10,14 @@ export default async function NewSourcePage({
   searchParams: Promise<{ reviewId?: string }>;
 }) {
   const params = await searchParams;
+  const database = await getDb();
 
-  const availableReviews = db
+  const availableReviews = await database
     .select({
       id: reviews.id,
       title: reviews.title,
     })
-    .from(reviews)
-    .all();
+    .from(reviews);
 
   return (
     <div className="space-y-6">

@@ -2,11 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { db } from "@/db";
+import { getDb } from "@/db";
 import { curatedAlternatives, reviews, pcs } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { requireAdmin } from "@/lib/session";
 import { curatedAlternativeSchema } from "@/lib/validations";
+import { invalidatePublicCache } from "@/lib/cache-invalidation";
 import crypto from "crypto";
 
 export async function saveAlternativeAction(
@@ -29,8 +30,11 @@ export async function saveAlternativeAction(
   const displayOrder = parseInt((formData.get("displayOrder") as string) || "1", 10);
   const isApproved = formData.get("isApproved") === "1" || formData.get("isApproved") === "true";
 
+  const database = await getDb();
+
   // 1. Verifica che la recensione sorgente esista
-  const sourceReview = db.select().from(reviews).where(eq(reviews.id, sourceReviewId)).get();
+  const sourceReviewRows = await database.select().from(reviews).where(eq(reviews.id, sourceReviewId)).limit(1);
+  const sourceReview = sourceReviewRows && sourceReviewRows.length > 0 ? sourceReviewRows[0] : null;
   if (!sourceReview) {
     return { error: "Recensione di partenza non trovata." };
   }
@@ -43,7 +47,8 @@ export async function saveAlternativeAction(
   }
 
   // 3. Verifica che il PC target esista
-  const targetPc = db.select().from(pcs).where(eq(pcs.id, targetPcId)).get();
+  const targetPcRows = await database.select().from(pcs).where(eq(pcs.id, targetPcId)).limit(1);
+  const targetPc = targetPcRows && targetPcRows.length > 0 ? targetPcRows[0] : null;
   if (!targetPc) {
     return { error: "PC alternativo selezionato non trovato nel catalogo." };
   }
@@ -72,7 +77,8 @@ export async function saveAlternativeAction(
 
   try {
     if (isEditing) {
-      db.update(curatedAlternatives)
+      await database
+        .update(curatedAlternatives)
         .set({
           sourceReviewId: validData.sourceReviewId,
           targetPcId: validData.targetPcId,
@@ -85,10 +91,10 @@ export async function saveAlternativeAction(
           isApproved: validData.isApproved ? 1 : 0,
           lastVerifiedAt: now,
         })
-        .where(eq(curatedAlternatives.id, id))
-        .run();
+        .where(eq(curatedAlternatives.id, id));
     } else {
-      db.insert(curatedAlternatives)
+      await database
+        .insert(curatedAlternatives)
         .values({
           id,
           sourceReviewId: validData.sourceReviewId,
@@ -102,66 +108,82 @@ export async function saveAlternativeAction(
           isApproved: validData.isApproved ? 1 : 0,
           lastVerifiedAt: now,
           createdAt: now,
-        })
-        .run();
+        });
     }
   } catch (error: any) {
     return { error: `Errore durante il salvataggio: ${error.message}` };
   }
 
+  await invalidatePublicCache({ slug: sourceReview.slug });
   revalidatePath("/admin/alternatives");
   revalidatePath("/admin/reviews");
   revalidatePath("/admin");
-  revalidatePath("/");
   redirect("/admin/alternatives");
 }
 
 export async function toggleApprovalAction(id: string) {
   await requireAdmin();
+  const database = await getDb();
 
-  const alt = db.select().from(curatedAlternatives).where(eq(curatedAlternatives.id, id)).get();
+  const rows = await database.select().from(curatedAlternatives).where(eq(curatedAlternatives.id, id)).limit(1);
+  const alt = rows && rows.length > 0 ? rows[0] : null;
   if (!alt) throw new Error("Alternativa non trovata.");
 
   const newStatus = alt.isApproved === 1 ? 0 : 1;
   const now = Date.now();
 
-  db.update(curatedAlternatives)
+  await database
+    .update(curatedAlternatives)
     .set({
       isApproved: newStatus,
       lastVerifiedAt: now,
     })
-    .where(eq(curatedAlternatives.id, id))
-    .run();
+    .where(eq(curatedAlternatives.id, id));
 
+  const sourceReviews = await database.select().from(reviews).where(eq(reviews.id, alt.sourceReviewId)).limit(1);
+  await invalidatePublicCache({ slug: sourceReviews[0]?.slug });
   revalidatePath("/admin/alternatives");
   revalidatePath("/admin/reviews");
   revalidatePath("/admin");
-  revalidatePath("/");
 }
 
 export async function verifyAlternativeAction(id: string) {
   await requireAdmin();
+  const database = await getDb();
 
-  db.update(curatedAlternatives)
+  const rows = await database.select().from(curatedAlternatives).where(eq(curatedAlternatives.id, id)).limit(1);
+  const alt = rows && rows.length > 0 ? rows[0] : null;
+
+  await database
+    .update(curatedAlternatives)
     .set({
       lastVerifiedAt: Date.now(),
     })
-    .where(eq(curatedAlternatives.id, id))
-    .run();
+    .where(eq(curatedAlternatives.id, id));
 
+  if (alt) {
+    const sourceReviews = await database.select().from(reviews).where(eq(reviews.id, alt.sourceReviewId)).limit(1);
+    await invalidatePublicCache({ slug: sourceReviews[0]?.slug });
+  }
   revalidatePath("/admin/alternatives");
   revalidatePath("/admin/reviews");
   revalidatePath("/admin");
-  revalidatePath("/");
 }
 
 export async function deleteAlternativeAction(id: string) {
   await requireAdmin();
+  const database = await getDb();
 
-  db.delete(curatedAlternatives).where(eq(curatedAlternatives.id, id)).run();
+  const rows = await database.select().from(curatedAlternatives).where(eq(curatedAlternatives.id, id)).limit(1);
+  const alt = rows && rows.length > 0 ? rows[0] : null;
 
+  await database.delete(curatedAlternatives).where(eq(curatedAlternatives.id, id));
+
+  if (alt) {
+    const sourceReviews = await database.select().from(reviews).where(eq(reviews.id, alt.sourceReviewId)).limit(1);
+    await invalidatePublicCache({ slug: sourceReviews[0]?.slug });
+  }
   revalidatePath("/admin/alternatives");
   revalidatePath("/admin/reviews");
   revalidatePath("/admin");
-  revalidatePath("/");
 }
