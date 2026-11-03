@@ -43,11 +43,37 @@ test("Modulo Automazione SEO", async (t) => {
 
     assert.ok(meta.title.includes("HP OmniBook 3 16-by0001slx"));
     assert.ok(meta.title.includes("PCChiaro"));
-    assert.ok(meta.title.length <= 75, `Title troppo lungo: ${meta.title.length}`);
+    assert.ok(meta.title.length <= 110, `Title troppo lungo: ${meta.title.length}`);
 
     assert.ok(meta.description.includes("HP OmniBook 3 16-by0001slx"));
     assert.ok(meta.description.includes("AMD Ryzen 5 130"));
     assert.ok(meta.description.length <= 165, `Description troppo lunga: ${meta.description.length}`);
+  });
+
+  await t.test("generateSeoMeta pulisce ripetizioni di brand e CPU nel titolo (es. HP 250 G9)", () => {
+    const pcBug = {
+      brand: "HP",
+      modelName: "HP 250 G9 (Intel Core 5 120U)",
+      cpuModel: "Intel Core 5 120U",
+      ramGb: 16,
+      gpuModel: "Intel Graphics",
+    };
+    const reviewBug = {
+      title: "HP 250 G9 (Intel Core 5 120U + 16GB RAM)",
+      metaTitle: "HP HP 250 G9 (Intel Core 5 120U) (Intel Core 5 120U): Recensione & Test | PCChiaro",
+      metaDescription: "Recensione di HP HP 250 G9...",
+      summaryIntro: "Test",
+      verdict: "conveniente_offerta",
+      ratingGaming: "non_adatto",
+      ratingWork: "idoneo",
+      ratingOffice: "idoneo",
+    };
+    const meta = generateSeoMeta(reviewBug, pcBug);
+    assert.equal(
+      meta.title,
+      "HP 250 G9 (Intel Core 5 120U, 16GB RAM): Scheda Tecnica, Limiti e Alternative | PCChiaro"
+    );
+    assert.ok(!meta.description.includes("HP HP"));
   });
 
   await t.test("generateReviewFaqs genera domande e risposte oggettive basate sull'hardware reale", () => {

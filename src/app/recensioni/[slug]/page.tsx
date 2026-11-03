@@ -7,7 +7,7 @@ import { eq, and, asc } from "drizzle-orm";
 import { SITE_CONFIG } from "@/config/site";
 import { getShowExactPrices, getAmazonAffiliateTagAsync } from "@/lib/settings";
 import { buildAffiliateUrl } from "@/lib/affiliate";
-import { generateSeoMeta, generateReviewFaqs, generateStructuredData } from "@/lib/seo-engine";
+import { generateSeoMeta, generateReviewFaqs, generateStructuredData, getCleanBrandModel } from "@/lib/seo-engine";
 import SiteHeader from "@/components/public/site-header";
 import SiteFooter from "@/components/public/site-footer";
 import BottomNav from "@/components/public/bottom-nav";
@@ -235,7 +235,7 @@ export default async function ReviewDetailPage({ params }: ReviewPageProps) {
             </li>
             <li>/</li>
             <li className="text-slate-800 font-semibold truncate max-w-xs sm:max-w-md">
-              {pc.brand} {pc.modelName}
+              {getCleanBrandModel(pc.brand, pc.modelName, pc.cpuModel)}
             </li>
           </ol>
         </nav>

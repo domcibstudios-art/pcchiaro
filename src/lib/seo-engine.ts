@@ -54,6 +54,33 @@ export interface FaqItem {
 }
 
 /**
+ * Pulisce il nome del modello e del brand per evitare duplicazioni:
+ * - Rimuove il brand se già presente all'inizio del modelName (es. "HP HP 250 G9" -> "HP 250 G9")
+ * - Rimuove specifiche duplicate tra parentesi nel modelName (es. "(Intel Core 5 120U)")
+ */
+export function getCleanBrandModel(brand: string, modelName: string, cpuModel?: string): string {
+  let cleanBrand = (brand || "").trim();
+  let cleanModel = (modelName || "").trim();
+
+  // Rimuove il brand se duplicato all'inizio del modelName (es. brand "HP", model "HP 250 G9")
+  if (cleanBrand) {
+    const brandRegex = new RegExp(`^${cleanBrand.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&")}\\s+`, "i");
+    cleanModel = cleanModel.replace(brandRegex, "").trim();
+  }
+
+  // Rimuove la CPU o pattern di CPU tra parentesi dal modelName se corrispondono o se sono generiche
+  if (cpuModel) {
+    const escapedCpu = cpuModel.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&");
+    cleanModel = cleanModel.replace(new RegExp(`\\s*\\(${escapedCpu}[^)]*\\)`, "i"), "").trim();
+  }
+  cleanModel = cleanModel
+    .replace(/\\s*\\((?:Intel|AMD|Core|Ryzen|Celeron|Pentium|Apple|Qualcomm|Snapdragon)[^)]*\\)/gi, "")
+    .trim();
+
+  return cleanBrand ? `${cleanBrand} ${cleanModel}`.trim() : cleanModel;
+}
+
+/**
  * 1. Genera Meta Title e Meta Description ottimizzati
  */
 export function generateSeoMeta(
@@ -61,21 +88,32 @@ export function generateSeoMeta(
   pc: PcMetaInput,
   offer?: OfferMetaInput
 ): { title: string; description: string } {
-  // META TITLE: se inserito manualmente lo usa, altrimenti usa la formula ad alto CTR
+  const brandModel = getCleanBrandModel(pc.brand, pc.modelName, pc.cpuModel);
+  const specs = [pc.cpuModel, pc.ramGb ? `${pc.ramGb}GB RAM` : ""].filter(Boolean).join(", ");
+
+  // Rileva se un titolo contiene ripetizioni grossolane di parole consecutive (es. "HP HP")
+  // o parentesi duplicate di seguito es. "(Intel...) (Intel...)"
+  const hasRepetitions = (str?: string | null): boolean => {
+    if (!str) return false;
+    return (
+      /\b([a-zA-Z0-9]+)\s+\1\b/i.test(str) ||
+      /\([^)]+\)\s*\([^)]+\)/.test(str)
+    );
+  };
+
+  // META TITLE: se inserito manualmente e privo di duplicazioni lo usa, altrimenti usa la formula ad alto CTR
   let title = review.metaTitle?.trim();
-  if (!title) {
-    const brandModel = `${pc.brand} ${pc.modelName}`.trim();
-    // Limita lunghezza per evitare troncamenti su Google (target 55-65 caratteri)
-    if (brandModel.length <= 35) {
-      title = `${brandModel} (${pc.cpuModel}): Recensione & Test | PCChiaro`;
+  if (!title || hasRepetitions(title)) {
+    if (specs) {
+      title = `${brandModel} (${specs}): Scheda Tecnica, Limiti e Alternative | PCChiaro`;
     } else {
-      title = `${brandModel}: Conviene davvero? Recensione | PCChiaro`;
+      title = `${brandModel}: Scheda Tecnica, Limiti e Alternative | PCChiaro`;
     }
   }
 
-  // META DESCRIPTION: se inserita manualmente la usa, altrimenti genera lo snippet persuasivo
+  // META DESCRIPTION: se inserita manualmente e priva di duplicazioni la usa, altrimenti genera lo snippet persuasivo
   let description = review.metaDescription?.trim();
-  if (!description) {
+  if (!description || hasRepetitions(description)) {
     const verdictLabel =
       review.verdict === "sconsigliato"
         ? "Sconsigliato (Trappola Hardware)"
@@ -88,7 +126,7 @@ export function generateSeoMeta(
     const ramText = `${pc.ramGb || 16}GB ${pc.ramType || "RAM"}`;
     const storageText = `${pc.storageCapacityGb || 512}GB ${pc.storageType || "SSD"}`;
 
-    description = `Recensione di ${pc.brand} ${pc.modelName} (${pc.cpuModel}, ${pc.gpuModel}, ${ramText}, ${storageText}). Verdetto: ${verdictLabel}. Limiti reali, test e alternative.`;
+    description = `Recensione di ${brandModel} (${pc.cpuModel}, ${pc.gpuModel}, ${ramText}, ${storageText}). Verdetto: ${verdictLabel}. Limiti reali, test e alternative.`;
 
     if (description.length > 158) {
       description = description.slice(0, 155).trim() + "...";
@@ -154,10 +192,11 @@ export function generateReviewFaqs(review: ReviewMetaInput, pc: PcMetaInput): Fa
   });
 
   // FAQ 4: Verdetto editoriale sintetico
+  const brandModel = getCleanBrandModel(pc.brand, pc.modelName, pc.cpuModel);
   let verdictSummary = `La redazione di PCChiaro assegna a questa configurazione il verdetto: ${review.verdict.toUpperCase().replace("_", " ")}. `;
   verdictSummary += review.summaryIntro;
   faqs.push({
-    question: `Qual è il giudizio finale della redazione su ${pc.brand} ${pc.modelName}?`,
+    question: `Qual è il giudizio finale della redazione su ${brandModel}?`,
     answer: verdictSummary.trim(),
   });
 
@@ -184,6 +223,7 @@ export function generateStructuredData(
   const strengthsList: string[] = review.strengths ? JSON.parse(review.strengths) : [];
   const weaknessesList: string[] = review.weaknesses ? JSON.parse(review.weaknesses) : [];
 
+  const brandModel = getCleanBrandModel(pc.brand, pc.modelName, pc.cpuModel);
   const reviewSchema = {
     "@context": "https://schema.org",
     "@type": "Review",
@@ -191,7 +231,7 @@ export function generateStructuredData(
     description: review.summaryIntro,
     itemReviewed: {
       "@type": "Product",
-      name: `${pc.brand} ${pc.modelName}`,
+      name: brandModel,
       brand: {
         "@type": "Brand",
         name: pc.brand,
