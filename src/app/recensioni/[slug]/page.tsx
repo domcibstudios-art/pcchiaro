@@ -57,7 +57,13 @@ export async function generateMetadata({ params }: ReviewPageProps): Promise<Met
     activeOffer ? { asin: activeOffer.asin, priceAmountEur: activeOffer.priceAmountEur } : undefined
   );
 
+  const siteUrl =
+    process.env.NEXT_PUBLIC_SITE_URL && !process.env.NEXT_PUBLIC_SITE_URL.includes("localhost")
+      ? process.env.NEXT_PUBLIC_SITE_URL
+      : "https://pcchiaro.domcibstudios.workers.dev";
+
   return {
+    metadataBase: new URL(siteUrl),
     title: pageTitle,
     description: pageDesc,
     openGraph: {

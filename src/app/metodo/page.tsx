@@ -5,7 +5,13 @@ import SiteHeader from "@/components/public/site-header";
 import SiteFooter from "@/components/public/site-footer";
 import BottomNav from "@/components/public/bottom-nav";
 
+const siteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL && !process.env.NEXT_PUBLIC_SITE_URL.includes("localhost")
+    ? process.env.NEXT_PUBLIC_SITE_URL
+    : "https://pcchiaro.domcibstudios.workers.dev";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: "Metodo Editoriale & Criteri di Verifica | PCChiaro.it",
   description:
     "Scopri come analizziamo i PC preassemblati su Amazon.it: i 5 livelli di verdetto, le basi informative e i 10 segnali d'allarme per smontare le trappole hardware.",
