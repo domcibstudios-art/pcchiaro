@@ -8,6 +8,7 @@
  */
 
 import { SITE_CONFIG } from "@/config/site";
+import { fixItalianApostrophes } from "@/lib/typography";
 
 export interface ReviewMetaInput {
   title: string;
@@ -133,7 +134,10 @@ export function generateSeoMeta(
     }
   }
 
-  return { title, description };
+  return {
+    title: fixItalianApostrophes(title),
+    description: fixItalianApostrophes(description),
+  };
 }
 
 /**
@@ -200,7 +204,10 @@ export function generateReviewFaqs(review: ReviewMetaInput, pc: PcMetaInput): Fa
     answer: verdictSummary.trim(),
   });
 
-  return faqs;
+  return faqs.map((f) => ({
+    question: fixItalianApostrophes(f.question),
+    answer: fixItalianApostrophes(f.answer),
+  }));
 }
 
 /**
@@ -224,11 +231,14 @@ export function generateStructuredData(
   const weaknessesList: string[] = review.weaknesses ? JSON.parse(review.weaknesses) : [];
 
   const brandModel = getCleanBrandModel(pc.brand, pc.modelName, pc.cpuModel);
+  const fullCanonical = canonicalUrl ? `${SITE_CONFIG.defaultUrl}${canonicalUrl}` : SITE_CONFIG.defaultUrl;
+
   const reviewSchema = {
     "@context": "https://schema.org",
     "@type": "Review",
-    headline: review.title,
-    description: review.summaryIntro,
+    headline: fixItalianApostrophes(review.title),
+    description: fixItalianApostrophes(review.summaryIntro),
+    url: fullCanonical,
     itemReviewed: {
       "@type": "Product",
       name: brandModel,
@@ -261,19 +271,19 @@ export function generateStructuredData(
     author: {
       "@type": "Organization",
       name: SITE_CONFIG.name,
-      url: "https://pcchiaro.it",
+      url: SITE_CONFIG.defaultUrl,
     },
     publisher: {
       "@type": "Organization",
       name: SITE_CONFIG.name,
-      url: "https://pcchiaro.it",
+      url: SITE_CONFIG.defaultUrl,
     },
     positiveNotes: strengthsList.length > 0 ? {
       "@type": "ItemList",
       itemListElement: strengthsList.map((str, idx) => ({
         "@type": "ListItem",
         position: idx + 1,
-        name: str,
+        name: fixItalianApostrophes(str),
       })),
     } : undefined,
     negativeNotes: weaknessesList.length > 0 ? {
@@ -281,9 +291,54 @@ export function generateStructuredData(
       itemListElement: weaknessesList.map((wk, idx) => ({
         "@type": "ListItem",
         position: idx + 1,
-        name: wk,
+        name: fixItalianApostrophes(wk),
       })),
     } : undefined,
+  };
+
+  const techArticleSchema = {
+    "@context": "https://schema.org",
+    "@type": "TechArticle",
+    headline: fixItalianApostrophes(review.title),
+    description: fixItalianApostrophes(review.summaryIntro),
+    url: fullCanonical,
+    inLanguage: "it-IT",
+    author: {
+      "@type": "Organization",
+      name: SITE_CONFIG.name,
+      url: SITE_CONFIG.defaultUrl,
+    },
+    publisher: {
+      "@type": "Organization",
+      name: SITE_CONFIG.name,
+      url: SITE_CONFIG.defaultUrl,
+    },
+    about: {
+      "@type": "Product",
+      name: brandModel,
+      brand: {
+        "@type": "Brand",
+        name: pc.brand,
+      },
+      sku: offer?.asin || undefined,
+      description: `${pc.cpuModel}, ${pc.gpuModel}, ${pc.ramGb}GB RAM, ${pc.storageCapacityGb}GB SSD`,
+      positiveNotes: strengthsList.length > 0 ? {
+        "@type": "ItemList",
+        itemListElement: strengthsList.map((str, idx) => ({
+          "@type": "ListItem",
+          position: idx + 1,
+          name: fixItalianApostrophes(str),
+        })),
+      } : undefined,
+      negativeNotes: weaknessesList.length > 0 ? {
+        "@type": "ItemList",
+        itemListElement: weaknessesList.map((wk, idx) => ({
+          "@type": "ListItem",
+          position: idx + 1,
+          name: fixItalianApostrophes(wk),
+        })),
+      } : undefined,
+    },
   };
 
   const faqSchema = faqs && faqs.length > 0 ? {
@@ -291,16 +346,17 @@ export function generateStructuredData(
     "@type": "FAQPage",
     mainEntity: faqs.map((f) => ({
       "@type": "Question",
-      name: f.question,
+      name: fixItalianApostrophes(f.question),
       acceptedAnswer: {
         "@type": "Answer",
-        text: f.answer,
+        text: fixItalianApostrophes(f.answer),
       },
     })),
   } : null;
 
   return {
     reviewSchema,
+    techArticleSchema,
     faqSchema,
   };
 }

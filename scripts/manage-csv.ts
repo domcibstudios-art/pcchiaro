@@ -7,6 +7,7 @@ import { eq, and } from "drizzle-orm";
 import { parseAmazonListing } from "../src/lib/amazon-extractor";
 import { parseCsvText } from "../src/lib/csv-parser";
 import { generateSeoMeta } from "../src/lib/seo-engine";
+import { fixItalianApostrophes } from "../src/lib/typography";
 
 const CSV_HEADER = [
   "asin",
@@ -190,20 +191,22 @@ export function importFromCsv(filePath: string, publish: boolean = false) {
       .replace(/^-+|-+$/g, "")
       .slice(0, 60) + (asin ? `-${asin.toLowerCase()}` : "");
 
-    const strengthsArray = puntiForza ? puntiForza.split("|").map((s) => s.trim()).filter(Boolean) : [];
-    const weaknessesArray = criticita ? criticita.split("|").map((s) => s.trim()).filter(Boolean) : [];
+    const cleanTitle = fixItalianApostrophes(titoloRecensione || modello);
+    const cleanIntro = fixItalianApostrophes(sommarioIntro || `Bozza importata da CSV per ${brand} ${modello}.`);
+    const strengthsArray = puntiForza ? puntiForza.split("|").map((s) => fixItalianApostrophes(s.trim())).filter(Boolean) : [];
+    const weaknessesArray = criticita ? criticita.split("|").map((s) => fixItalianApostrophes(s.trim())).filter(Boolean) : [];
 
     const { title: autoMetaTitle, description: autoMetaDesc } = generateSeoMeta(
       {
-        title: titoloRecensione || modello,
-        summaryIntro: sommarioIntro || `Bozza importata da CSV per ${brand} ${modello}.`,
+        title: cleanTitle,
+        summaryIntro: cleanIntro,
         verdict: (verdetto as any) || "accettabile_base",
         ratingGaming: (semaforoGaming as any) || "limitato",
-        notesGaming: noteGaming || "",
+        notesGaming: fixItalianApostrophes(noteGaming || ""),
         ratingWork: (semaforoLavoro as any) || "limitato",
-        notesWork: noteLavoro || "",
+        notesWork: fixItalianApostrophes(noteLavoro || ""),
         ratingOffice: (semaforoUfficio as any) || "idoneo",
-        notesOffice: noteUfficio || "",
+        notesOffice: fixItalianApostrophes(noteUfficio || ""),
       },
       {
         brand: brand || "Brand",
@@ -240,22 +243,23 @@ export function importFromCsv(filePath: string, publish: boolean = false) {
         tx.update(reviews)
           .set({
             slug,
-            title: titoloRecensione || modello,
+            title: cleanTitle,
             metaTitle: autoMetaTitle,
             metaDescription: autoMetaDesc,
-            summaryIntro: sommarioIntro || `Bozza importata da CSV per ${brand} ${modello}.`,
+            summaryIntro: cleanIntro,
             verdict: (verdetto as any) || "accettabile_base",
             strengths: JSON.stringify(strengthsArray),
             weaknesses: JSON.stringify(weaknessesArray),
             ratingGaming: (semaforoGaming as any) || "limitato",
-            notesGaming: noteGaming || "",
+            notesGaming: fixItalianApostrophes(noteGaming || ""),
             ratingWork: (semaforoLavoro as any) || "limitato",
-            notesWork: noteLavoro || "",
+            notesWork: fixItalianApostrophes(noteLavoro || ""),
             ratingOffice: (semaforoUfficio as any) || "idoneo",
-            notesOffice: noteUfficio || "",
+            notesOffice: fixItalianApostrophes(noteUfficio || ""),
             amazonListingPriceEur: parsedPrice,
             estimatedFairValueEur: parsedFairValue,
             status: publish ? "published" : existingReview.status,
+            publishedAt: publish ? (existingReview.publishedAt || now) : existingReview.publishedAt,
             updatedAt: now,
           })
           .where(eq(reviews.id, existingReview.id))
@@ -312,23 +316,24 @@ export function importFromCsv(filePath: string, publish: boolean = false) {
           id: reviewId,
           pcId: pcId,
           slug,
-          title: titoloRecensione || modello,
+          title: cleanTitle,
           metaTitle: autoMetaTitle,
           metaDescription: autoMetaDesc,
-          summaryIntro: sommarioIntro || `Bozza importata da CSV per ${brand} ${modello}.`,
+          summaryIntro: cleanIntro,
           verdict: (verdetto as any) || "accettabile_base",
           evidenceLevel: "specifiche_dichiarate",
           strengths: JSON.stringify(strengthsArray),
           weaknesses: JSON.stringify(weaknessesArray),
           ratingGaming: (semaforoGaming as any) || "limitato",
-          notesGaming: noteGaming || "",
+          notesGaming: fixItalianApostrophes(noteGaming || ""),
           ratingWork: (semaforoLavoro as any) || "limitato",
-          notesWork: noteLavoro || "",
+          notesWork: fixItalianApostrophes(noteLavoro || ""),
           ratingOffice: (semaforoUfficio as any) || "idoneo",
-          notesOffice: noteUfficio || "",
+          notesOffice: fixItalianApostrophes(noteUfficio || ""),
           amazonListingPriceEur: parsedPrice,
           estimatedFairValueEur: parsedFairValue,
           status: publish ? "published" : "draft",
+          publishedAt: publish ? now : null,
           updatedAt: now,
         }).run();
 

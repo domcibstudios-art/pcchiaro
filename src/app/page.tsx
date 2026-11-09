@@ -1,4 +1,3 @@
-import { Suspense } from "react";
 import { getDb } from "@/db";
 import { pcs, reviews, priceOffers } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
@@ -103,10 +102,8 @@ export default async function HomePage() {
           </div>
         </section>
 
-        {/* FEED INTERATTIVO CON FILTRI E RICERCA */}
-        <Suspense fallback={<div className="py-12 text-center text-sm text-slate-500">Caricamento catalogo recensioni...</div>}>
-          <FilterFeed items={feedItems} />
-        </Suspense>
+        {/* FEED INTERATTIVO CON FILTRI E RICERCA (100% SSR HTML) */}
+        <FilterFeed items={feedItems} />
 
         {/* GUIDA RAPIDA AUTODIFESA HARDWARE */}
         <section id="autodifesa" className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-sm">

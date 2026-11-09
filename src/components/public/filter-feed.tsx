@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
 import ReviewCard, { ReviewCardItem } from "./review-card";
 
 interface FilterFeedProps {
@@ -11,22 +10,18 @@ interface FilterFeedProps {
 type FilterCategory = "all" | "gaming" | "work" | "office" | "trappole";
 
 export default function FilterFeed({ items }: FilterFeedProps) {
-  const searchParams = useSearchParams();
-  const initialFilter = (searchParams.get("filter") as FilterCategory) || "all";
-
-  const [activeFilter, setActiveFilter] = useState<FilterCategory>(
-    ["all", "gaming", "work", "office", "trappole"].includes(initialFilter)
-      ? initialFilter
-      : "all"
-  );
+  const [activeFilter, setActiveFilter] = useState<FilterCategory>("all");
   const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
-    const f = searchParams.get("filter") as FilterCategory;
-    if (f && ["all", "gaming", "work", "office", "trappole"].includes(f)) {
-      setActiveFilter(f);
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const f = params.get("filter") as FilterCategory;
+      if (f && ["all", "gaming", "work", "office", "trappole"].includes(f)) {
+        setActiveFilter(f);
+      }
     }
-  }, [searchParams]);
+  }, []);
 
   const filteredItems = useMemo(() => {
     return items.filter((item) => {

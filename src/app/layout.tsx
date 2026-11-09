@@ -21,15 +21,10 @@ const hankenGrotesk = Hanken_Grotesk({
   display: "swap",
 });
 
-const siteUrl =
-  process.env.NEXT_PUBLIC_SITE_URL && !process.env.NEXT_PUBLIC_SITE_URL.includes("localhost")
-    ? process.env.NEXT_PUBLIC_SITE_URL
-    : "https://pcchiaro.domcibstudios.workers.dev";
-
 export const metadata: Metadata = {
   title: `${SITE_CONFIG.name} - ${SITE_CONFIG.tagline}`,
   description: SITE_CONFIG.description,
-  metadataBase: new URL(siteUrl),
+  metadataBase: new URL(SITE_CONFIG.defaultUrl),
   verification: {
     google: "google83ee7aeee61dfeea",
   },

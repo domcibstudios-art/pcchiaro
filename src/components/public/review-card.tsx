@@ -2,6 +2,7 @@ import Link from "next/link";
 import VerdictBadge from "./verdict-badge";
 import TrafficLightGrid from "./traffic-light-grid";
 import { SITE_CONFIG } from "@/config/site";
+import { fixItalianApostrophes } from "@/lib/typography";
 
 export interface ReviewCardItem {
   review: {
@@ -103,11 +104,11 @@ export default function ReviewCard({
             href={`/recensioni/${review.slug}`}
             className="hover:text-brand transition-colors"
           >
-            {review.title || `${pc.brand} ${pc.modelName}`}
+            {fixItalianApostrophes(review.title || `${pc.brand} ${pc.modelName}`)}
           </Link>
         </h3>
         <p className="text-xs sm:text-sm text-slate-600 mt-1.5 leading-relaxed">
-          {review.summaryIntro}
+          {fixItalianApostrophes(review.summaryIntro)}
         </p>
       </div>
 

@@ -8,7 +8,10 @@ export const SITE_CONFIG = {
   tagline: "La chiarezza sull'hardware prima di comprare",
   description:
     "Portale indipendente che analizza le schede tecniche dei PC preassemblati su Amazon.it per smontare le trappole commerciali e guidarti all'acquisto consapevole.",
-  defaultUrl: "https://pcchiaro.it",
+  defaultUrl:
+    process.env.NEXT_PUBLIC_SITE_URL && !process.env.NEXT_PUBLIC_SITE_URL.includes("localhost")
+      ? process.env.NEXT_PUBLIC_SITE_URL
+      : "https://pcchiaro.domcibstudios.workers.dev",
   locale: "it-IT",
   themeColor: "#1d4ed8", // Blu Cobalto primario
 

@@ -8,6 +8,7 @@ import { SITE_CONFIG } from "@/config/site";
 import { getShowExactPrices, getAmazonAffiliateTagAsync } from "@/lib/settings";
 import { buildAffiliateUrl } from "@/lib/affiliate";
 import { generateSeoMeta, generateReviewFaqs, generateStructuredData, getCleanBrandModel } from "@/lib/seo-engine";
+import { fixItalianApostrophes } from "@/lib/typography";
 import SiteHeader from "@/components/public/site-header";
 import SiteFooter from "@/components/public/site-footer";
 import BottomNav from "@/components/public/bottom-nav";
@@ -57,13 +58,8 @@ export async function generateMetadata({ params }: ReviewPageProps): Promise<Met
     activeOffer ? { asin: activeOffer.asin, priceAmountEur: activeOffer.priceAmountEur } : undefined
   );
 
-  const siteUrl =
-    process.env.NEXT_PUBLIC_SITE_URL && !process.env.NEXT_PUBLIC_SITE_URL.includes("localhost")
-      ? process.env.NEXT_PUBLIC_SITE_URL
-      : "https://pcchiaro.domcibstudios.workers.dev";
-
   return {
-    metadataBase: new URL(siteUrl),
+    metadataBase: new URL(SITE_CONFIG.defaultUrl),
     title: pageTitle,
     description: pageDesc,
     openGraph: {
@@ -181,7 +177,7 @@ export default async function ReviewDetailPage({ params }: ReviewPageProps) {
 
   // Generazione automatica FAQ e Dati Strutturati Schema.org
   const faqs = generateReviewFaqs(review, pc);
-  const { reviewSchema, faqSchema } = generateStructuredData(
+  const { reviewSchema, techArticleSchema, faqSchema } = generateStructuredData(
     review,
     pc,
     activeOffer
@@ -198,6 +194,14 @@ export default async function ReviewDetailPage({ params }: ReviewPageProps) {
     `/recensioni/${slug}`
   );
 
+  const isWin11Official = pc.cpuWin11Support === 1 || (pc.osOfficialSupport === 1 && pc.cpuWin11Support !== 0);
+  const isWin11Unsupported = pc.cpuWin11Support === 0 || pc.osOfficialSupport === 0;
+  const win11SupportLabel = isWin11Official
+    ? "Garantito (Requisiti Microsoft soddisfatti)"
+    : isWin11Unsupported
+    ? "Non garantito / Bypass"
+    : "Da verificare";
+
   return (
     <div className="min-h-screen flex flex-col pb-20 md:pb-0">
       {/* SCHEMA.ORG STRUCTURED DATA (JSON-LD) PER GOOGLE */}
@@ -207,6 +211,14 @@ export default async function ReviewDetailPage({ params }: ReviewPageProps) {
           __html: JSON.stringify(reviewSchema).replace(/</g, "\\u003c"),
         }}
       />
+      {techArticleSchema && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(techArticleSchema).replace(/</g, "\\u003c"),
+          }}
+        />
+      )}
       {faqSchema && (
         <script
           type="application/ld+json"
@@ -256,11 +268,11 @@ export default async function ReviewDetailPage({ params }: ReviewPageProps) {
           </div>
 
           <h1 className="font-headline font-extrabold text-2xl sm:text-4xl text-slate-900 leading-tight">
-            {review.title}
+            {fixItalianApostrophes(review.title)}
           </h1>
 
           <p className="text-base sm:text-lg text-slate-600 leading-relaxed font-normal">
-            {review.summaryIntro}
+            {fixItalianApostrophes(review.summaryIntro)}
           </p>
 
           <div className="flex flex-wrap items-center gap-3 pt-2">
@@ -346,7 +358,7 @@ export default async function ReviewDetailPage({ params }: ReviewPageProps) {
                 {pc.osInstalled || "Windows"}
               </span>
               <span className="text-slate-500 text-[11px] mt-0.5">
-                Supporto ufficiale Microsoft: {pc.osOfficialSupport === 1 ? "Garantito" : "Non garantito / Bypass"}
+                Supporto ufficiale Microsoft: {win11SupportLabel}
               </span>
             </div>
           </div>
@@ -404,7 +416,7 @@ export default async function ReviewDetailPage({ params }: ReviewPageProps) {
                 {strengthsList.map((str, i) => (
                   <li key={i} className="flex items-start gap-2">
                     <span className="text-emerald-600 font-bold shrink-0 mt-0.5">&bull;</span>
-                    <span>{str}</span>
+                    <span>{fixItalianApostrophes(str)}</span>
                   </li>
                 ))}
               </ul>
@@ -425,7 +437,7 @@ export default async function ReviewDetailPage({ params }: ReviewPageProps) {
                 {weaknessesList.map((weak, i) => (
                   <li key={i} className="flex items-start gap-2">
                     <span className="text-red-600 font-bold shrink-0 mt-0.5">&bull;</span>
-                    <span>{weak}</span>
+                    <span>{fixItalianApostrophes(weak)}</span>
                   </li>
                 ))}
               </ul>
@@ -447,7 +459,7 @@ export default async function ReviewDetailPage({ params }: ReviewPageProps) {
               </h2>
             </div>
             <p className="text-xs sm:text-sm text-slate-700 leading-relaxed">
-              {review.whyPositiveReviews}
+              {fixItalianApostrophes(review.whyPositiveReviews)}
             </p>
           </section>
         )}

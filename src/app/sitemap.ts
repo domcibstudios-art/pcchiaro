@@ -4,10 +4,12 @@ import { getDb } from "@/db";
 import { reviews } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
+import { SITE_CONFIG } from "@/config/site";
+
 export const dynamic = "force-dynamic";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  let baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://pcchiaro.domcibstudios.workers.dev";
+  let baseUrl = SITE_CONFIG.defaultUrl;
   try {
     const h = await headers();
     const host = h.get("host") || h.get("x-forwarded-host");
@@ -17,10 +19,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }
   } catch {
     // Fuori contesto richiesta HTTP
-  }
-
-  if (baseUrl.includes("localhost") && process.env.NODE_ENV === "production") {
-    baseUrl = "https://pcchiaro.domcibstudios.workers.dev";
   }
 
   // Pagine statiche principali
@@ -46,14 +44,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       .select({
         slug: reviews.slug,
         updatedAt: reviews.updatedAt,
+        publishedAt: reviews.publishedAt,
       })
       .from(reviews)
       .where(eq(reviews.status, "published"));
 
     for (const r of publishedReviews) {
+      const lastMod = r.publishedAt ? new Date(r.publishedAt) : new Date(r.updatedAt);
       routes.push({
         url: `${baseUrl}/recensioni/${r.slug}`,
-        lastModified: new Date(r.updatedAt),
+        lastModified: lastMod,
         changeFrequency: "weekly",
         priority: 0.9,
       });
