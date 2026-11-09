@@ -233,6 +233,10 @@ export function generateStructuredData(
   const brandModel = getCleanBrandModel(pc.brand, pc.modelName, pc.cpuModel);
   const fullCanonical = canonicalUrl ? `${SITE_CONFIG.defaultUrl}${canonicalUrl}` : SITE_CONFIG.defaultUrl;
 
+  const productImage =
+    pc.imageUrl ||
+    (offer?.asin ? `https://m.media-amazon.com/images/P/${offer.asin}.01._SCLZZZZZZZ_SX500_.jpg` : undefined);
+
   const reviewSchema = {
     "@context": "https://schema.org",
     "@type": "Review",
@@ -242,6 +246,7 @@ export function generateStructuredData(
     itemReviewed: {
       "@type": "Product",
       name: brandModel,
+      image: productImage,
       brand: {
         "@type": "Brand",
         name: pc.brand,
@@ -314,30 +319,9 @@ export function generateStructuredData(
       url: SITE_CONFIG.defaultUrl,
     },
     about: {
-      "@type": "Product",
+      "@type": "Thing",
       name: brandModel,
-      brand: {
-        "@type": "Brand",
-        name: pc.brand,
-      },
-      sku: offer?.asin || undefined,
       description: `${pc.cpuModel}, ${pc.gpuModel}, ${pc.ramGb}GB RAM, ${pc.storageCapacityGb}GB SSD`,
-      positiveNotes: strengthsList.length > 0 ? {
-        "@type": "ItemList",
-        itemListElement: strengthsList.map((str, idx) => ({
-          "@type": "ListItem",
-          position: idx + 1,
-          name: fixItalianApostrophes(str),
-        })),
-      } : undefined,
-      negativeNotes: weaknessesList.length > 0 ? {
-        "@type": "ItemList",
-        itemListElement: weaknessesList.map((wk, idx) => ({
-          "@type": "ListItem",
-          position: idx + 1,
-          name: fixItalianApostrophes(wk),
-        })),
-      } : undefined,
     },
   };
 
